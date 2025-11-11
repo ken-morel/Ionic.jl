@@ -1,6 +1,6 @@
 export transcribe
 
-const Transcription = @NamedTuple{code::Expr, gets::Vector, sets::Vector}
+const Transcription = @NamedTuple{code, gets::Vector, sets::Vector}
 
 """
     function transcribe(orig)::Tuple{Any, Vector, Vector}
