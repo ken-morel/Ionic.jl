@@ -73,21 +73,30 @@ value if one of it dependencies changed(
 isfouled(r) is true).
 """
 function getvalue(r::Reactor{T}) where {T}
-    return @lock r begin
+    old_value = r._value
+    val = @lock r begin
         if r.fouled
             r._value = r.getter()
             r.fouled = false
         end
         r._value
     end
+    if haskey(TRACING_ENABLED, r)
+        @lock TRACING_LOCK push!(TRACING_LOG, (:get, r, old_value, val, stacktrace()[2]))
+    end
+    val
 end
 
 function setvalue!(r::Reactor{T}, new_value; notify::Bool = true) where {T}
+    old_value = r._value
     @lock r begin
         if isnothing(r.setter)
             r.setter(convert(T, new_value))
         end
         r.fouled = true
+    end
+    if haskey(TRACING_ENABLED, r)
+        @lock TRACING_LOCK push!(TRACING_LOG, (:set, r, old_value, new_value, stacktrace()[2]))
     end
     notify && Base.notify(r)
     return

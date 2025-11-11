@@ -22,10 +22,20 @@ end
 
 
 
-getvalue(r::Reactant{T}) where {T} = r.value[]
+getvalue(r::Reactant{T}) where {T} = begin
+    val = r.value[]
+    if haskey(TRACING_ENABLED, r)
+        @lock TRACING_LOCK push!(TRACING_LOG, (:get, r, val, val, stacktrace()[2]))
+    end
+    val
+end
 
 function setvalue!(r::Reactant{T}, new_value; notify::Bool = true) where {T}
+    old_value = r.value[]
     @lock r r.value[] = convert(T, new_value)
+    if haskey(TRACING_ENABLED, r)
+        @lock TRACING_LOCK push!(TRACING_LOG, (:set, r, old_value, new_value, stacktrace()[2]))
+    end
     notify && Base.notify(r)
     return r
 end

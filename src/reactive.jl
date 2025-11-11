@@ -1,4 +1,4 @@
-const BuiltinReactive{T} = Union{Reactant{T},Reactor{T}}
+const BuiltinReactive{T} = Union{Reactant{T}, Reactor{T}}
 
 """
     Base.push!(a::AbstractReactive, r::AbstractReaction)
@@ -16,6 +16,9 @@ Base.pop!(a::BuiltinReactive, r::Reaction) = @lock a filter!(o -> o !== r, a.rea
 
 
 function Base.notify(r::BuiltinReactive)
+    if haskey(TRACING_ENABLED, r)
+        @lock TRACING_LOCK push!(TRACING_LOG, (:notify, r, nothing, nothing, stacktrace()[2]))
+    end
     for reaction in (@lock r copy(r.reactions))
         reaction.callback(r)
     end
@@ -32,7 +35,7 @@ end
 
 
 function denature!(r::BuiltinReactive)
-    @lock r for r in copy(r.reactions)
+    return @lock r for r in copy(r.reactions)
         inhibit!(r)
     end
 end
