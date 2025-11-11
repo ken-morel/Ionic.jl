@@ -5,8 +5,7 @@ export getvalue, setvalue!, catalyze!, inhibit!, denature!
 export resolve, MayBeReactive
 export AbstractReactive, Reactor
 export update!, alter!
-
-
+export @ionic, @reactor, @radical
 
 
 """
@@ -58,7 +57,7 @@ arguments which may be an instance of abstract reactive.
 
 You can then call resolve() on them which 
 """
-const MayBeReactive{T} = Union{AbstractReactive{T},T}
+const MayBeReactive{T} = Union{AbstractReactive{T}, T}
 
 """
     converter(::Type{AbstractReactive{T}}, r::AbstractReactive{K};eager) where {T, K}
@@ -68,7 +67,7 @@ from converting that of the other and set's it with another
 conversion.
 """
 
-converter(::Type{T}, r::AbstractReactive{K}; eager::Bool = false) where {T,K} = Reactor{T}(
+converter(::Type{T}, r::AbstractReactive{K}; eager::Bool = false) where {T, K} = Reactor{T}(
     () -> convert(T, getvalue(r)),
     (v::T) -> setvalue!(r, convert(K, v)),
     [r];
@@ -136,7 +135,7 @@ Synchronize the values of the given reactive values.
 """
 function sync!(c::AbstractCatalyst, reactives::AbstractReactive ...)
     local from::AbstractReactive
-    local notifier = Base.Lockable{Union{AbstractReactive,Nothing},ReentrantLock}(
+    local notifier = Base.Lockable{Union{AbstractReactive, Nothing}, ReentrantLock}(
         nothing,
         ReentrantLock(),
     )
@@ -157,6 +156,7 @@ function sync!(c::AbstractCatalyst, reactives::AbstractReactive ...)
             end
         end
     end
+    return
 end
 
 end # module Ionic
