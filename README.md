@@ -2,6 +2,30 @@
 
 Reactivity constructs for [Efus.jl](https://github.com/ken-morel/Efus.jl)
 
+A full pack of nice names, Reactant, Reactor, Catalyst, and few more
+to revive your form 2 chem. Not that I love the subject, it actually
+caused my worst grade
+
+```chem
+(salt + funnel + H2O ---pooring--> 😢).
+```
+
+In short:
+
+- A `Reaction`: Links a `Catalyst`, a `Reactant` and a callback. An
+  can be `inhibit!` -ed. Your usually don't have to manage this.
+- A `Catalyst`: `catalyze!` and manage reactions with `Reactants` ,
+  can be `denature!` -ed.
+- a `Reactant` hold a value and notify all ongoing reactions when
+  it's value change.
+- A `Reactor`: holds several catalysts, and acts like a computed
+  reactant whose value depends on other `AbstractReactive` objects
+  and whose value is lazily-computed.
+- `@ionic`: is just a tool, a translater, or something like that,
+  I'm not so good at names, but in fact, it transforms assignments
+  and getting values to ''' prepended values into
+  a `IonicEfus.setvalue` and `IonicEfus.getvalue!` call.
+
 So you have three things, the `AbstractCatalyst`, the `AbstractReaction{T}`
 and the `AbstractReactive{T}`.
 
