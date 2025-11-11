@@ -8,7 +8,7 @@ The code returns the evaluated expression.
 See also [`@reactor`](@ref)
 """
 macro ionic(expr)
-    return esc(IonicEfus.Ionic.transcribe(expr).code)
+    return esc(transcribe(expr).code)
 end
 
 """
@@ -28,9 +28,9 @@ macro reactor(expr, setter = nothing, usedeps = nothing)
     else
         expr, :Any
     end
-    trans = IonicEfus.Ionic.transcribe(expr)
+    trans = transcribe(expr)
     setter = if !isnothing(setter)
-        IonicEfus.Ionic.transcribe(setter).code
+        transcribe(setter).code
     end
     deps = something(usedeps, Expr(:vect, trans.gets...))
     return esc(:(IonicEfus.Reactor{$type}(() -> $(trans.code), $setter, $deps)))
@@ -52,7 +52,7 @@ macro radical(expr, usedeps = nothing, setter = nothing)
     else
         expr, :Any
     end
-    trans = IonicEfus.Ionic.transcribe(expr)
+    trans = transcribe(expr)
     setter = if !isnothing(setter)
         IonicEfus.Ionic.transcribe(setter).code
     end
