@@ -5,6 +5,7 @@
 It serves as the core reactivity engine for the [Efus.jl](https://github.com/ken-morel/Efus.jl) component framework.
 
 [![code style: runic](https://img.shields.io/badge/code_style-%E1%9A%B1%E1%9A%A2%E1%9A%BE%E1%9B%81%E1%9A%B2-black)](https://github.com/fredrikekre/Runic.jl)
+[![CI](https://github.com/ken-morel/Ionic.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/ken-morel/Ionic.jl/actions/workflows/CI.yml)
 
 ## Core Concepts
 
@@ -39,7 +40,7 @@ println(b') #> 10
 # Change the source value
 a' = 10
 
-println(b') #> 20
+println(b[]) #> 20
 ```
 
 ## API Overview
@@ -94,9 +95,9 @@ height = Reactant(5)
 area = @reactor width' * height'
 
 # An eager reactor that prints on change
-_ = @radical "Area is now $(area')"
+_ = @radical println("Area is now $(area')")
 
-width' = 20 # The radical reactor will trigger and print "Area is now 100"
+width[] = 20 # The radical reactor will trigger and print "Area is now 100"
 ```
 
 ### `Catalyst`
@@ -115,10 +116,10 @@ c = Catalyst()
 r = Reactant("Hello")
 
 catalyze!(c, r) do changed_reactant
-    println("Value changed to: ", getvalue(changed_reactant))
+    println("Value changed to: ", changed_reactant[])
 end
 
-r' = "World" #> Prints "Value changed to: World"
+@ionic r' = "World" #> Prints "Value changed to: World"
 
 # Clean up all subscriptions
 denature!(c)
