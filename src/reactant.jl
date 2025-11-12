@@ -10,9 +10,10 @@ mutable struct Reactant{T} <: AbstractReactive{T}
     reactions::Vector{AbstractReaction{T}}
 
     lock::Base.ReentrantLock
+    trace::Union{Nothing, UInt}
 
     Reactant(ref::Ref{T}) where {T} =
-        finalizer(denature!, new{T}(ref, AbstractReaction{T}[], Base.ReentrantLock()))
+        finalizer(inhibit!, new{T}(ref, AbstractReaction{T}[], Base.ReentrantLock(), nothing))
 
     Reactant(val::T) where {T} = Reactant(Ref(val))
 
@@ -21,44 +22,12 @@ mutable struct Reactant{T} <: AbstractReactive{T}
 end
 
 
-
-getvalue(r::Reactant{T}) where {T} = r.value[]
-
-function setvalue!(r::Reactant{T}, new_value; notify::Bool = true) where {T}
-    @lock r r.value[] = convert(T, new_value)
-    notify && Base.notify(r)
-    return r
+function getvalue(r::Reactant{T}) where {T}
+    return Tracing.record(() -> r.value[], r.trace, Tracing.Get)
 end
 
-
-"""
-    inhibit!(catalyst::Catalyst, reactant::AbstractReactive, callback::Union{Function, Nothing} = nothing)
-    inhibit!(::Reaction)
-
-
-Searches and inhibit all reactions between the catalyst and reactant, if a callback is 
-passed, it checks for a reaction which has that callback.
-returns the number of inhibited reactions.
-"""
-function inhibit!(
-    catalyst::AbstractCatalyst,
-    reactant::AbstractReactive,
-    callback::Union{Function,Nothing} = nothing,
-)
-    return @lock catalyst begin
-        reactions_to_inhibit = if isnothing(callback)
-            filter(catalyst.reactions) do sub
-                sub.reactant === reactant
-            end
-        else
-            filter(catalyst.reactions) do sub
-                sub.reactant === reactant && sub.callback === callback
-            end
-        end
-
-        for reaction in reactions_to_inhibit
-            inhibit!(reaction)
-        end
-        length(reactions_to_inhibit)
-    end
+function setvalue!(r::Reactant{T}, new_value; notify::Bool = true) where {T}
+    Tracing.record(() -> @lock(r, r.value[] = convert(T, new_value)), r.trace, Tracing.Set)
+    notify && Base.notify(r)
+    return new_value
 end

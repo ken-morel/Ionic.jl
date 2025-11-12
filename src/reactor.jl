@@ -11,22 +11,23 @@ yet updated.
 """
 mutable struct Reactor{T} <: AbstractReactive{T}
     const getter::Function
-    const setter::Union{Function,Nothing}
+    const setter::Union{Function, Nothing}
     const content::Vector{AbstractReactive}
     const reactions::Vector{AbstractReaction{T}}
     const catalyst::Catalyst
     _value::T
     fouled::Bool
+    trace::Union{UInt, Nothing}
     const eager::Bool
     const lock::Base.ReentrantLock
 
     function Reactor{T}(
-        getter::Function,
-        setter::Union{Function,Nothing} = nothing,
-        content::Vector{<:AbstractReactive} = AbstractReactive[];
-        eager::Bool = false,
-        initial = nothing,
-    ) where {T}
+            getter::Function,
+            setter::Union{Function, Nothing} = nothing,
+            content::Vector{<:AbstractReactive} = AbstractReactive[];
+            eager::Bool = false,
+            initial = nothing,
+        ) where {T}
         if isnothing(initial) && T !== Nothing
             initial = convert(T, getter())
         end
@@ -38,6 +39,7 @@ mutable struct Reactor{T} <: AbstractReactive{T}
             Catalyst(),
             initial,
             false,
+            nothing,
             eager,
             Base.ReentrantLock(),
         )
@@ -51,17 +53,16 @@ mutable struct Reactor{T} <: AbstractReactive{T}
             push!(r.content, reactant)
             catalyze!(r.catalyst, reactant, callback)
         end
-        return finalizer(denature!, r)
+        return finalizer(inhibit!, r)
     end
 
 end
 Reactor(
     getter::Function,
-    setter::Union{Function,Nothing},
+    setter::Union{Function, Nothing},
     content::Vector{<:AbstractReactive};
     eager::Bool = false,
 ) = Reactor{Union{Base.return_types(getter)...}}(getter, setter, content; eager)
-
 
 isfouled(r::Reactor) = @lock r r.fouled
 
@@ -73,22 +74,27 @@ value if one of it dependencies changed(
 isfouled(r) is true).
 """
 function getvalue(r::Reactor{T}) where {T}
-    return @lock r begin
-        if r.fouled
-            r._value = r.getter()
-            r.fouled = false
+    return Tracing.record(r.trace, Tracing.Get) do
+        @lock r begin
+            if r.fouled
+                r._value = r.getter()
+                r.fouled = false
+            end
+            r._value
         end
-        r._value
     end
 end
 
 function setvalue!(r::Reactor{T}, new_value; notify::Bool = true) where {T}
-    @lock r begin
-        if isnothing(r.setter)
-            r.setter(convert(T, new_value))
+    Tracing.record(r.trace, Tracing.Set) do
+        @lock r begin
+            if !isnothing(r.setter)
+                r.setter(convert(T, new_value))
+            end
+            r.fouled = true
         end
-        r.fouled = true
+        new_value
     end
     notify && Base.notify(r)
-    return
+    return new_value
 end

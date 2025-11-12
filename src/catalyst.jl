@@ -62,10 +62,10 @@ end
 ```
 """
 function catalyze!(
-    c::Catalyst,
-    r::AbstractReactive{T},
-    callback::Function,
-)::Reaction{T} where {T}
+        c::Catalyst,
+        r::AbstractReactive{T},
+        callback::Function,
+    )::Reaction{T} where {T}
 
     reaction = Reaction{T}(r, c, callback)
 
@@ -90,4 +90,37 @@ function denature!(c::Catalyst)
         inhibit!(reaction)
     end
     return
+end
+
+
+"""
+    inhibit!(catalyst::Catalyst, reactant::AbstractReactive, callback::Union{Function, Nothing} = nothing)
+    inhibit!(::Reaction)
+
+
+Searches and inhibit all reactions between the catalyst and reactant, if a callback is 
+passed, it checks for a reaction which has that callback.
+returns the number of inhibited reactions.
+"""
+function inhibit!(
+        catalyst::AbstractCatalyst,
+        reactant::AbstractReactive,
+        callback::Union{Function, Nothing} = nothing,
+    )
+    return @lock catalyst begin
+        reactions_to_inhibit = if isnothing(callback)
+            filter(catalyst.reactions) do sub
+                sub.reactant === reactant
+            end
+        else
+            filter(catalyst.reactions) do sub
+                sub.reactant === reactant && sub.callback === callback
+            end
+        end
+
+        for reaction in reactions_to_inhibit
+            inhibit!(reaction)
+        end
+        length(reactions_to_inhibit)
+    end
 end

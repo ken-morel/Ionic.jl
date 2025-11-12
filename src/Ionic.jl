@@ -7,6 +7,8 @@ export AbstractReactive, Reactor
 export update!, alter!
 export @ionic, @reactor, @radical
 
+export trace!, gettrace
+
 
 """
     abstract type AbstractReactive{T} end
@@ -34,6 +36,8 @@ catalyze!(::AbstractCatalyst, ::AbstractReactive, fn::Function; kw...) =
 abstract type AbstractReaction{T} end
 
 
+include("trace.jl")
+
 include("catalyst.jl")
 
 include("reaction.jl")
@@ -43,6 +47,7 @@ include("reactant.jl")
 include("reactor.jl")
 
 include("reactive.jl")
+
 
 include("transcribe.jl")
 

@@ -24,9 +24,9 @@ function transcribe(orig::Expr)::Transcription
             current.args = [getvalue, current.args[1]]
             current.args[1] isa Expr && push!(todo, current.args[1])
         elseif current.head == Symbol("=") &&
-               length(current.args) == 2 &&
-               current.args[1] isa Expr &&
-               current.args[1].head == Symbol("'")
+                length(current.args) == 2 &&
+                current.args[1] isa Expr &&
+                current.args[1].head == Symbol("'")
             # it is an assignment to a reactive variable
             reactive_var = current.args[1].args[1]
             push!(dependents, reactive_var)

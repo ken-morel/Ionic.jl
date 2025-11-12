@@ -1,0 +1,265 @@
+"""
+utilities for tracing of reactive objects.
+"""
+module Tracing
+using ..Ionic: Ionic
+using Dates
+
+abstract type Trace end
+
+
+struct TraceLog
+    object::Ionic.AbstractReactive
+    traces::Vector{Trace}
+    TraceLog(r::Ionic.AbstractReactive) = new(r, Trace[])
+end
+Base.push!(l::TraceLog, t::Trace) = push!(l.traces, t)
+
+const TRACE = Dict{UInt, TraceLog}()
+const TRACE_SM = Base.Semaphore(1)
+TRACE_COUNT::UInt = 1
+
+function gettrace(id::UInt)
+    id == 0 && return nothing
+    return Base.acquire(TRACE_SM) do
+        if haskey(TRACE, id)
+            TRACE[id]
+        end
+    end
+end
+function createtrace(r::Ionic.AbstractReactive)
+    return Base.acquire(TRACE_SM) do
+        global TRACE_COUNT
+        id = TRACE_COUNT
+        TRACE_COUNT += 1
+        TRACE[id] = TraceLog(r)
+        id
+    end
+end
+function trace(id::UInt, t::Trace)
+    return Base.acquire(TRACE_SM) do
+        push!(TRACE[id], t)
+    end
+end
+
+
+@kwdef struct Get <: Trace
+    value
+    stack::Base.StackTraces.StackTrace
+    start::UInt
+    stop::UInt
+    error::Union{Exception, Nothing}
+end
+
+
+@kwdef struct Set <: Trace
+    value
+    stack::Base.StackTraces.StackTrace
+    start::UInt
+    stop::UInt
+    error::Union{Exception, Nothing}
+end
+
+
+function record(fn::Function, id::UInt, ::Type{T}) where {T <: Union{Get, Set}}
+    start = time_ns()
+    value = nothing
+    error = nothing
+    stack = stacktrace()
+
+
+    return try
+        value = fn()
+    catch e
+        error = e
+        rethrow()
+    finally
+        stop = time_ns()
+        trace(id, T(; value, start, stop, error, stack))
+    end
+end
+record(fn::Function, ::Nothing, ::Type{T}) where {T <: Union{Get, Set}} = fn()
+
+@kwdef struct Notify <: Trace
+    stack::Base.StackTraces.StackTrace
+    start::UInt
+    stop::UInt
+    reactions::Vector{Ionic.AbstractReaction}
+    error::Union{Exception, Nothing}
+end
+
+function record(fn::Function, id::UInt, ::Type{Notify})
+    start = time_ns()
+    error = nothing
+    stack = stacktrace()
+
+    reactions = Ionic.AbstractReaction[]
+    return try
+        reactions = fn()
+    catch e
+        error = e
+        rethrow()
+    finally
+        stop = time_ns()
+        trace(id, Notify(; start, stop, error, stack, reactions))
+    end
+end
+record(fn::Function, ::Nothing, ::Type{T}) where {T <: Trace} = fn()
+
+@kwdef struct Subscribe <: Trace
+    reaction::Ionic.AbstractReaction
+
+    start::UInt
+    stop::UInt
+    stack::Base.StackTraces.StackTrace
+end
+
+@kwdef struct Unsubscribe <: Trace
+    reaction::Ionic.AbstractReaction
+    start::UInt
+    stop::UInt
+    stack::Base.StackTraces.StackTrace
+end
+@kwdef struct Inhibit <: Trace
+    start::UInt
+    stop::UInt
+    error::Union{Exception, Nothing}
+    stack::Base.StackTraces.StackTrace
+end
+function record(fn::Function, id::UInt, ::Type{Inhibit})
+    start = time_ns()
+    error = nothing
+    stack = stacktrace()
+
+    return try
+        fn()
+    catch e
+        error = e
+        rethrow()
+    finally
+        stop = time_ns()
+        trace(id, Inhibit(; start, stop, error, stack))
+    end
+end
+record(fn::Function, ::Nothing, ::Type{Inhibit}) = fn()
+
+function record(fn::Function, id::UInt, ::Type{T}, reaction::Ionic.AbstractReaction) where {T <: Union{Subscribe, Unsubscribe}}
+    start = time_ns()
+    error = nothing
+    stack = stacktrace()
+
+
+    try
+        return ret = fn()
+    catch e
+        error = e
+        rethrow()
+    finally
+        stop = time_ns()
+        trace(id, T(; reaction, start, stop, stack))
+    end
+end
+record(fn::Function, ::Nothing, ::Type{T}, ::Ionic.AbstractReaction) where {T <: Union{Subscribe, Unsubscribe}} = fn()
+
+# --- Trace Visualization ---
+
+const DIR_NAME = dirname(@__FILE__)
+function find_origin_frame(stack::Base.StackTraces.StackTrace)
+    for frame in stack
+        if startswith(String(frame.file), DIR_NAME)
+            continue
+        end
+        return frame
+    end
+    return stack[end] # Fallback, should not be reached in practice
+end
+
+
+function format_time(ns)
+    if ns < 1_000
+        return "$ns ns"
+    elseif ns < 1_000_000
+        return "$(round(ns / 1_000, digits = 2)) μs"
+    elseif ns < 1_000_000_000
+        return "$(round(ns / 1_000_000, digits = 2)) ms"
+    else
+        return "$(round(ns / 1_000_000_000, digits = 2)) s"
+    end
+end
+
+function format_datetime(io::IO, ns_timestamp::UInt)
+    dt = unix2datetime(ns_timestamp / 1.0e9)
+    printstyled(io, Dates.format(dt, "HH:MM"); color = :light_black)
+    printstyled(io, ":"; color = :white)
+    return printstyled(io, Dates.format(dt, "SS.s"); color = :light_black)
+end
+
+function Base.show(io::IO, ::MIME"text/plain", event::Get)
+    format_datetime(io, event.start)
+    print(io, " ")
+    printstyled(io, "GET"; color = :cyan)
+    println(io, " ($(format_time(event.stop - event.start)))")
+    println(io, "  Value: ", event.value)
+    printstyled(io, "  From: ", color = :light_black)
+    return println(io, find_origin_frame(event.stack))
+end
+
+function Base.show(io::IO, ::MIME"text/plain", event::Set)
+    format_datetime(io, event.start)
+    print(io, " ")
+    printstyled(io, "SET"; color = :magenta)
+    println(io, " ($(format_time(event.stop - event.start)))")
+    println(io, "  New Value: ", event.value)
+    printstyled(io, "  From: ", color = :light_black)
+    return println(io, find_origin_frame(event.stack))
+end
+
+function Base.show(io::IO, ::MIME"text/plain", event::Notify)
+    format_datetime(io, event.start)
+    print(io, " ")
+    printstyled(io, "NOTIFY"; color = :yellow)
+    println(io, " ($(format_time(event.stop - event.start)))")
+    println(io, "  Reactions triggered: ", length(event.reactions))
+    printstyled(io, "  From: ", color = :light_black)
+    return println(io, find_origin_frame(event.stack))
+end
+
+function Base.show(io::IO, ::MIME"text/plain", event::Subscribe)
+    format_datetime(io, event.start)
+    print(io, " ")
+    printstyled(io, "SUBSCRIBE"; color = :green)
+    println(io, " ($(format_time(event.stop - event.start)))")
+
+    printstyled(io, "  From: ", color = :light_black)
+    return println(io, find_origin_frame(event.stack))
+end
+
+function Base.show(io::IO, ::MIME"text/plain", event::Unsubscribe)
+    format_datetime(io, event.start)
+    print(io, " ")
+    printstyled(io, "UNSUBSCRIBE"; color = :red)
+    println(io, " ($(format_time(event.stop - event.start)))")
+
+    printstyled(io, "  From: ", color = :light_black)
+    return println(io, find_origin_frame(event.stack))
+end
+
+function Base.show(io::IO, ::MIME"text/plain", event::Inhibit)
+    format_datetime(io, event.start)
+    print(io, " ")
+    printstyled(io, "INHIBIT"; color = :red)
+    return println(io, " ($(format_time(event.stop - event.start)))")
+end
+
+function Base.show(io::IO, m::MIME"text/plain", log::TraceLog)
+    println(io, "TraceLog for ", typeof(log.object), ":")
+    for (i, event) in enumerate(log.traces)
+        print(io, i, ". ")
+        show(io, m, event)
+    end
+    return
+end
+
+printtrace(l::TraceLog) = show(stdout, MIME("text/plain"), l)
+
+end
