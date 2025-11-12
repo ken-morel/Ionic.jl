@@ -45,7 +45,7 @@ end
 
 @kwdef struct Get <: Trace
     value
-    stack::Vector{Base.StackTraces.StackFrame}
+    stack::Base.StackTraces.StackTrace
     start::UInt
     stop::UInt
     error::Union{Exception, Nothing}
@@ -54,7 +54,7 @@ end
 
 @kwdef struct Set <: Trace
     value
-    stack::Vector{Base.StackTraces.StackFrame}
+    stack::Base.StackTraces.StackTrace
     start::UInt
     stop::UInt
     error::Union{Exception, Nothing}
@@ -65,7 +65,9 @@ function record(fn::Function, id::UInt, ::Type{T}) where {T <: Union{Get, Set}}
     start = time_ns()
     value = nothing
     error = nothing
-    stack = stacktrace() # Capture the full stack trace
+    stack = stacktrace()
+
+
     return try
         value = fn()
     catch e
@@ -79,7 +81,7 @@ end
 record(fn::Function, ::Nothing, ::Type{T}) where {T <: Union{Get, Set}} = fn()
 
 @kwdef struct Notify <: Trace
-    stack::Vector{Base.StackTraces.StackFrame}
+    stack::Base.StackTraces.StackTrace
     start::UInt
     stop::UInt
     reactions::Vector{Ionic.AbstractReaction}
@@ -89,7 +91,8 @@ end
 function record(fn::Function, id::UInt, ::Type{Notify})
     start = time_ns()
     error = nothing
-    stack = stacktrace() # Capture the full stack trace
+    stack = stacktrace()
+
     reactions = Ionic.AbstractReaction[]
     return try
         reactions = fn()
@@ -108,43 +111,64 @@ record(fn::Function, ::Nothing, ::Type{T}) where {T <: Trace} = fn()
 
     start::UInt
     stop::UInt
+    stack::Base.StackTraces.StackTrace
 end
 
 @kwdef struct Unsubscribe <: Trace
     reaction::Ionic.AbstractReaction
     start::UInt
     stop::UInt
+    stack::Base.StackTraces.StackTrace
 end
 @kwdef struct Inhibit <: Trace
     start::UInt
     stop::UInt
+    error::Union{Exception, Nothing}
+    stack::Base.StackTraces.StackTrace
 end
 function record(fn::Function, id::UInt, ::Type{Inhibit})
     start = time_ns()
-    fn()
-    stop = time_ns()
-    return trace(id, Inhibit(; start, stop))
+    error = nothing
+    stack = stacktrace()
+
+    return try
+        fn()
+    catch e
+        error = e
+        rethrow()
+    finally
+        stop = time_ns()
+        trace(id, Inhibit(; start, stop, error, stack))
+    end
 end
 record(fn::Function, ::Nothing, ::Type{Inhibit}) = fn()
 
 function record(fn::Function, id::UInt, ::Type{T}, reaction::Ionic.AbstractReaction) where {T <: Union{Subscribe, Unsubscribe}}
     start = time_ns()
-    ret = fn()
-    stop = time_ns()
-    trace(id, T(; reaction, start, stop))
-    return ret
+    error = nothing
+    stack = stacktrace()
+
+
+    try
+        return ret = fn()
+    catch e
+        error = e
+        rethrow()
+    finally
+        stop = time_ns()
+        trace(id, T(; reaction, start, stop, stack))
+    end
 end
 record(fn::Function, ::Nothing, ::Type{T}, ::Ionic.AbstractReaction) where {T <: Union{Subscribe, Unsubscribe}} = fn()
 
 # --- Trace Visualization ---
 
-function find_origin_frame(stack::Vector{Base.StackTraces.StackFrame})
+const DIR_NAME = dirname(@__FILE__)
+function find_origin_frame(stack::Base.StackTraces.StackTrace)
     for frame in stack
-        # Skip frames from this file (trace.jl)
-        if String(frame.file) == @__FILE__
+        if startswith(String(frame.file), DIR_NAME)
             continue
         end
-        # This is the first frame outside of trace.jl
         return frame
     end
     return stack[end] # Fallback, should not be reached in practice
@@ -164,10 +188,10 @@ function format_time(ns)
 end
 
 function format_datetime(io::IO, ns_timestamp::UInt)
-    dt = unix2datetime(ns_timestamp / 1e9)
-    printstyled(io, Dates.format(dt, "HH:MM"); color=:light_black)
-    printstyled(io, ":"; color=:white)
-    printstyled(io, Dates.format(dt, "SS.s"); color=:light_black)
+    dt = unix2datetime(ns_timestamp / 1.0e9)
+    printstyled(io, Dates.format(dt, "HH:MM"); color = :light_black)
+    printstyled(io, ":"; color = :white)
+    return printstyled(io, Dates.format(dt, "SS.s"); color = :light_black)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", event::Get)
@@ -204,14 +228,20 @@ function Base.show(io::IO, ::MIME"text/plain", event::Subscribe)
     format_datetime(io, event.start)
     print(io, " ")
     printstyled(io, "SUBSCRIBE"; color = :green)
-    return println(io, " ($(format_time(event.stop - event.start)))")
+    println(io, " ($(format_time(event.stop - event.start)))")
+
+    printstyled(io, "  From: ", color = :light_black)
+    return println(io, find_origin_frame(event.stack))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", event::Unsubscribe)
     format_datetime(io, event.start)
     print(io, " ")
     printstyled(io, "UNSUBSCRIBE"; color = :red)
-    return println(io, " ($(format_time(event.stop - event.start)))")
+    println(io, " ($(format_time(event.stop - event.start)))")
+
+    printstyled(io, "  From: ", color = :light_black)
+    return println(io, find_origin_frame(event.stack))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", event::Inhibit)

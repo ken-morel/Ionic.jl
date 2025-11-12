@@ -64,7 +64,6 @@ Reactor(
     eager::Bool = false,
 ) = Reactor{Union{Base.return_types(getter)...}}(getter, setter, content; eager)
 
-
 isfouled(r::Reactor) = @lock r r.fouled
 
 """
@@ -89,7 +88,7 @@ end
 function setvalue!(r::Reactor{T}, new_value; notify::Bool = true) where {T}
     Tracing.record(r.trace, Tracing.Set) do
         @lock r begin
-            if isnothing(r.setter)
+            if !isnothing(r.setter)
                 r.setter(convert(T, new_value))
             end
             r.fouled = true

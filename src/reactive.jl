@@ -53,6 +53,4 @@ function trace!(c::BuiltinReactive, trace::Bool = true)
         end
     end
 end
-function gettrace(c::BuiltinReactive)
-    return Tracing.gettrace(c.trace)
-end
+gettrace(c::BuiltinReactive) = isnothing(c.trace) ? nothing : Tracing.gettrace(c.trace)

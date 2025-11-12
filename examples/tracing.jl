@@ -2,25 +2,27 @@ using Ionic
 
 c = Catalyst()
 
-r = Reactant(1)
+
+trace = nothing
 
 
 function jlmain(_)
-    trace!(r)
+    let r = Reactant(1)
+        trace!(r)
 
-    r[] = 2
-    setvalue!(r, 4)
+        r[] = 2
+        setvalue!(r, 4)
+
+        catalyze!(c, r) do r
+            println("New value: ", r[])
+        end
+
+        @radical rand(100, 100, r')
 
 
-    # catalyze!(c, r) do r
-    #     println("New value: ", r[])
-    # end
-
-    # @radical rand(100, 100, r')
-    #
-
-    Ionic.Tracing.printtrace(gettrace(r))
+        global trace = gettrace(r)
+    end
     return
 end
 
-(@main)(v) = jlmain(v)
+(@main)(v) = (jlmain(v); GC.gc(); Ionic.Tracing.printtrace(trace); 0)
