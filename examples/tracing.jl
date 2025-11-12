@@ -4,18 +4,23 @@ c = Catalyst()
 
 r = Reactant(1)
 
-trace!(r)
 
-catalyze!(c, r) do r
-    println("New value: ", r[])
+function jlmain(_)
+    trace!(r)
+
+    r[] = 2
+    setvalue!(r, 4)
+
+
+    # catalyze!(c, r) do r
+    #     println("New value: ", r[])
+    # end
+
+    # @radical rand(100, 100, r')
+    #
+
+    Ionic.Tracing.printtrace(gettrace(r))
+    return
 end
 
-r[] = 2
-
-@radical rand(100, 100, r')
-
-r[] = 6
-
-r[] = 8
-
-Ionic.Tracing.printtrace(gettrace(r))
+(@main)(v) = jlmain(v)

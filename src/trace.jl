@@ -3,6 +3,7 @@ utilities for tracing of reactive objects.
 """
 module Tracing
 using ..Ionic: Ionic
+using Dates
 
 abstract type Trace end
 
@@ -137,31 +138,18 @@ record(fn::Function, ::Nothing, ::Type{T}, ::Ionic.AbstractReaction) where {T <:
 
 # --- Trace Visualization ---
 
-const IONIC_SRC_PATH = dirname(@__FILE__)
-
 function find_origin_frame(stack::Vector{Base.StackTraces.StackFrame})
     for frame in stack
-        # Skip frames from files within the Ionic/src directory
-        if startswith(String(frame.file), IONIC_SRC_PATH)
-            continue
-        end
-        # This is the first frame outside of the Ionic source directory.
-        return frame
-    end
-    return stack[1] # Fallback
-end
-
-function isinternal(trace::Trace)
-    # Find the first frame outside of the Tracing module.
-    # If its path is still inside the Ionic/src directory, it's an internal call.
-    for frame in trace.stack
+        # Skip frames from this file (trace.jl)
         if String(frame.file) == @__FILE__
             continue
         end
-        return startswith(String(frame.file), IONIC_SRC_PATH)
+        # This is the first frame outside of trace.jl
+        return frame
     end
-    return false
+    return stack[end] # Fallback, should not be reached in practice
 end
+
 
 function format_time(ns)
     if ns < 1_000
@@ -175,11 +163,17 @@ function format_time(ns)
     end
 end
 
+function format_datetime(io::IO, ns_timestamp::UInt)
+    dt = unix2datetime(ns_timestamp / 1e9)
+    printstyled(io, Dates.format(dt, "HH:MM"); color=:light_black)
+    printstyled(io, ":"; color=:white)
+    printstyled(io, Dates.format(dt, "SS.s"); color=:light_black)
+end
+
 function Base.show(io::IO, ::MIME"text/plain", event::Get)
+    format_datetime(io, event.start)
+    print(io, " ")
     printstyled(io, "GET"; color = :cyan)
-    if isinternal(event)
-        printstyled(io, " (internal)"; color=:light_black)
-    end
     println(io, " ($(format_time(event.stop - event.start)))")
     println(io, "  Value: ", event.value)
     printstyled(io, "  From: ", color = :light_black)
@@ -187,10 +181,9 @@ function Base.show(io::IO, ::MIME"text/plain", event::Get)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", event::Set)
+    format_datetime(io, event.start)
+    print(io, " ")
     printstyled(io, "SET"; color = :magenta)
-    if isinternal(event)
-        printstyled(io, " (internal)"; color=:light_black)
-    end
     println(io, " ($(format_time(event.stop - event.start)))")
     println(io, "  New Value: ", event.value)
     printstyled(io, "  From: ", color = :light_black)
@@ -198,10 +191,9 @@ function Base.show(io::IO, ::MIME"text/plain", event::Set)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", event::Notify)
+    format_datetime(io, event.start)
+    print(io, " ")
     printstyled(io, "NOTIFY"; color = :yellow)
-    if isinternal(event)
-        printstyled(io, " (internal)"; color=:light_black)
-    end
     println(io, " ($(format_time(event.stop - event.start)))")
     println(io, "  Reactions triggered: ", length(event.reactions))
     printstyled(io, "  From: ", color = :light_black)
@@ -209,16 +201,22 @@ function Base.show(io::IO, ::MIME"text/plain", event::Notify)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", event::Subscribe)
+    format_datetime(io, event.start)
+    print(io, " ")
     printstyled(io, "SUBSCRIBE"; color = :green)
     return println(io, " ($(format_time(event.stop - event.start)))")
 end
 
 function Base.show(io::IO, ::MIME"text/plain", event::Unsubscribe)
+    format_datetime(io, event.start)
+    print(io, " ")
     printstyled(io, "UNSUBSCRIBE"; color = :red)
     return println(io, " ($(format_time(event.stop - event.start)))")
 end
 
 function Base.show(io::IO, ::MIME"text/plain", event::Inhibit)
+    format_datetime(io, event.start)
+    print(io, " ")
     printstyled(io, "INHIBIT"; color = :red)
     return println(io, " ($(format_time(event.stop - event.start)))")
 end
