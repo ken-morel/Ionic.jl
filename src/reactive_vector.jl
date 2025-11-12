@@ -2,7 +2,7 @@ abstract type VectorChange{T} end
 
 "Event representing `push!(vector, value)`."
 struct Push{T} <: VectorChange{T}
-    value::T
+    values::Vector{T}
 end
 public Push
 
@@ -42,6 +42,11 @@ struct ReplaceAll{T} <: VectorChange{T}
 end
 public ReplaceAll
 
+"Event representing `move!(vector, moves...)`"
+struct Move <: VectorChange
+    moves::Vector{Pair{Int, Int}}
+end
+
 """
 A specialized reaction for `ReactiveVector` that receives a list of `VectorChange{T}` events.
 The function receives (::ReactiveVector, Vector{VectorChange{T}})
@@ -74,14 +79,18 @@ mutable struct ReactiveVector{T} <: AbstractReactive{Vector{T}}
 end
 
 
-function setvalue!(rv::ReactiveVector{T}, new_value; notify::Bool = true) where {T}
-    val = convert(Vector{T}, new_value)
-    Tracing.record(() -> @lock(rv, rv.value = val), rv.trace, Tracing.Set)
-    notify && Base.notify(rv, ReplaceAll{T}(val))
-    return rv
-end
-function getvalue(rv::ReactiveVector)
-    return Tracing.record(() -> @lock(rv, rv.value), rv.trace, Tracing.Get)
+"""
+    move!(rv::ReactiveVector, moves::Pair{Int, Int}...)
+
+Move item to new locations
+"""
+function move!(rv::ReactiveVector, moves::Pair{Int, Int}...)
+    @lock rv begin
+        for (from, to) in moves
+            rv.value[to] = rv.value[from]
+        end
+    end
+    return notify(rv, [Move(moves)])
 end
 
 
@@ -104,10 +113,10 @@ end
 Base.notify(rv::ReactiveVector{T}) where {T} = notify(rv, ReplaceAll{T}(rv.value))
 
 
-function Base.push!(rv::ReactiveVector{T}, item) where {T}
-    val = convert(T, item)
-    @lock rv push!(rv.value, val)
-    Base.notify(rv, Push{T}(val))
+function Base.push!(rv::ReactiveVector{T}, items...) where {T}
+    val = convert.(T, items)
+    @lock rv push!(rv.value, items...)
+    Base.notify(rv, Push{T}(items))
     return rv
 end
 
@@ -145,12 +154,12 @@ end
 
 
 """
-    oncollectionchange(callback::Function, c::Catalyst, rv::ReactiveVector)
+    onchange(callback::Function, c::Catalyst, rv::ReactiveVector)
 
 Subscribes to a `ReactiveVector` with a callback that receives a batched list
 of `VectorChange{T}` events. The callback signature must be `(reactive, changes)`.
 """
-function oncollectionchange(
+function onchange(
         callback::Function,
         c::Catalyst,
         rv::ReactiveVector{T},
@@ -159,23 +168,6 @@ function oncollectionchange(
     add!(c, reaction)
     add!(rv, reaction)
     return reaction
-end
-
-"""
-    oncollectionchange(callback::Function, c::Catalyst, r::AbstractReactive{<:AbstractVector})
-
-Subscribes to any reactive vector (like a `Reactant{Vector{T}}`).
-The callback will receive a `[ReplaceAll(...)]` event on every change.
-"""
-function oncollectionchange(
-    callback::Function,
-    c::Catalyst,
-    r::AbstractReactive{V},
-) where {T, V <: AbstractVector{T}}
-    catalyze!(c, r) do reactive_vector
-        changes = [ReplaceAll{T}(getvalue(reactive_vector))]
-        callback(reactive_vector, changes)
-    end
 end
 
 Base.length(rv::ReactiveVector) = length(rv.value)
