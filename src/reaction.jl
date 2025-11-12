@@ -21,7 +21,7 @@ Stops and removes a single, specific Reaction. This is the low-level implementat
 It does so by calling [`pop!`](@ref) on the catalyst and reactants, which is again
 more lowlevel.
 """
-function inhibit!(r::Reaction)
+function inhibit!(r::AbstractReaction)
     remove!(r.catalyst, r)
     remove!(r.reactant, r)
 

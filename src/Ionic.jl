@@ -21,8 +21,6 @@ methods. And should have a .reactions attribute.
 """
 abstract type AbstractReactive{T} end
 
-getvalue(::AbstractReactive) = error("Not implemented")
-setvalue(::AbstractReactive, val; kw...) = error("Not implemented")
 Base.notify(::AbstractReactive) = error("Not implemented")
 
 Base.getindex(r::AbstractReactive) = getvalue(r)
@@ -46,9 +44,9 @@ include("reactant.jl")
 
 include("reactor.jl")
 
-include("reactive.jl")
-
 include("reactive_vector.jl")
+
+include("reactive.jl")
 
 include("transcribe.jl")
 

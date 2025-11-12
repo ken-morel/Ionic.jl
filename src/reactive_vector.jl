@@ -47,7 +47,7 @@ A specialized reaction for `ReactiveVector` that receives a list of `VectorChang
 The function receives (::ReactiveVector, Vector{VectorChange{T}})
 """
 struct VectorReaction{T} <: AbstractReaction{Vector{T}}
-    reactive::AbstractReactive{Vector{T}}
+    reactant::AbstractReactive{Vector{T}}
     catalyst::AbstractCatalyst
     callback::Function
 end
@@ -79,6 +79,9 @@ function setvalue!(rv::ReactiveVector{T}, new_value; notify::Bool = true) where 
     Tracing.record(() -> @lock(rv, rv.value = val), rv.trace, Tracing.Set)
     notify && Base.notify(rv, ReplaceAll{T}(val))
     return rv
+end
+function getvalue(rv::ReactiveVector)
+    return Tracing.record(() -> @lock(rv, rv.value), rv.trace, Tracing.Get)
 end
 
 
@@ -153,14 +156,14 @@ function onchange(
         rv::ReactiveVector{T},
     )::VectorReaction{T} where {T}
     reaction = VectorReaction{T}(rv, c, callback)
-    push!(c, reaction)
-    push!(rv, reaction)
+    add!(c, reaction)
+    add!(rv, reaction)
     return reaction
 end
 
 Base.length(rv::ReactiveVector) = length(rv.value)
 Base.iterate(rv::ReactiveVector, state...) = iterate(rv.value, state...)
-Base.getindex(rv::ReactiveVector, i...) = getindex(rv.value, i...)
+Base.getindex(rv::ReactiveVector, i, j...) = getindex(rv.value, i, j...)
 Base.lastindex(rv::ReactiveVector) = lastindex(rv.value)
 Base.firstindex(rv::ReactiveVector) = firstindex(rv.value)
 Base.eltype(rv::ReactiveVector{T}) where {T} = T
