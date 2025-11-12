@@ -27,7 +27,7 @@ oncollectionchange(changes_catalyst, rv) do reactive_vector, changes
     println("\n[Changes Listener] Received ", length(changes), " specific change(s): ")
     for change in changes
         if change isa Ionic.Push
-            println("  - PUSHED value: ", change.value)
+            println("  - PUSHED value(s): ", change.values)
         elseif change isa Ionic.Pop
             println("  - POPPED a value")
         elseif change isa Ionic.SetIndex
