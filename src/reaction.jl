@@ -1,5 +1,3 @@
-
-
 """
     struct Reaction{T} <: AbstractReaction{T}
 
@@ -24,8 +22,8 @@ It does so by calling [`pop!`](@ref) on the catalyst and reactants, which is aga
 more lowlevel.
 """
 function inhibit!(r::Reaction)
-    pop!(r.catalyst, r)
-    pop!(r.reactant, r)
+    remove!(r.catalyst, r)
+    remove!(r.reactant, r)
 
     return
 end

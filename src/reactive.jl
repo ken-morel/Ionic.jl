@@ -1,18 +1,18 @@
-const BuiltinReactive{T} = Union{Reactant{T}, Reactor{T}}
+const BuiltinReactive = Union{Reactant, Reactor, ReactiveList}
 
 """
-    Base.push!(a::AbstractReactive, r::AbstractReaction)
+    add!(a::AbstractReactive, r::AbstractReaction)
 
 Add the reaction to the reactive object(thread safe)
 """
-Base.push!(a::BuiltinReactive, r::Reaction) = Tracing.record(() -> @lock(a, push!(a.reactions, r)), a.trace, Tracing.Subscribe, r)
+add!(a::BuiltinReactive, r::Reaction) = Tracing.record(() -> @lock(a, push!(a.reactions, r)), a.trace, Tracing.Subscribe, r)
 
 """
-    Base.pop!(a::AbstractReactive, r::AbstractReaction)
+    remove!(a::AbstractReactive, r::AbstractReaction)
 
 Remove the reaction from the reactive object(thread safe)
 """
-Base.pop!(a::BuiltinReactive, r::Reaction) = Tracing.record(() -> @lock(a, filter!(o -> o !== r, a.reactions)), a.trace, Tracing.Unsubscribe, r)
+remove!(a::BuiltinReactive, r::Reaction) = Tracing.record(() -> @lock(a, filter!(o -> o !== r, a.reactions)), a.trace, Tracing.Unsubscribe, r)
 
 
 function Base.notify(r::BuiltinReactive)

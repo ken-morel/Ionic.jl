@@ -23,18 +23,18 @@ for fn in [:lock, :trylock, :unlock]
 end
 
 """
-    Base.push!(c::Catalyst, r::AbstractReaction)
+    add!(c::Catalyst, r::AbstractReaction)
 
 Add the reaction to the catalyst(thread safe)
 """
-Base.push!(c::Catalyst, r::AbstractReaction) = @lock c push!(c.reactions, r)
+add!(c::Catalyst, r::AbstractReaction) = @lock c push!(c.reactions, r)
 
 """
     Base.pop!(c::Catalyst, r::AbstractReaction)
 
 Remove the reaction from the catalyst(thread safe)
 """
-Base.pop!(c::Catalyst, r::AbstractReaction) = @lock c filter!(o -> o !== r, c.reactions)
+remove!(c::Catalyst, r::AbstractReaction) = @lock c filter!(o -> o !== r, c.reactions)
 
 
 """
@@ -69,8 +69,8 @@ function catalyze!(
 
     reaction = Reaction{T}(r, c, callback)
 
-    push!(c, reaction)
-    push!(r, reaction)
+    add!(c, reaction)
+    add!(r, reaction)
     return reaction
 end
 

@@ -7,7 +7,7 @@ export AbstractReactive, Reactor
 export update!, alter!
 export @ionic, @reactor, @radical
 
-export trace!, gettrace
+export trace!, gettrace, ReactiveVector, onchange
 
 
 """
@@ -48,6 +48,7 @@ include("reactor.jl")
 
 include("reactive.jl")
 
+include("reactive_vector.jl")
 
 include("transcribe.jl")
 
