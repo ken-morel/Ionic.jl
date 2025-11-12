@@ -35,4 +35,4 @@ withtrace = stop - start
 println("With trace took ", Ionic.Tracing.format_time(withtrace))
 difference = withtrace - withouttrace
 
-println("The time difference was ", Ionic.Tracing.format_time(difference), " so about ", round(difference / withouttrace * 100), "% more time")
+println("The time difference was ", Ionic.Tracing.format_time(difference), " so about ", round(difference / withouttrace * 100; digits = 4), "% more time")

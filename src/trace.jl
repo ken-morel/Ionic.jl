@@ -64,7 +64,7 @@ function record(fn::Function, id::UInt, ::Type{T}) where {T <: Union{Get, Set}}
     start = time_ns()
     value = nothing
     error = nothing
-    stack = stacktrace()[2:end]
+    stack = stacktrace() # Capture the full stack trace
     return try
         value = fn()
     catch e
@@ -88,7 +88,7 @@ end
 function record(fn::Function, id::UInt, ::Type{Notify})
     start = time_ns()
     error = nothing
-    stack = stacktrace()[2:end]
+    stack = stacktrace() # Capture the full stack trace
     reactions = Ionic.AbstractReaction[]
     return try
         reactions = fn()
@@ -137,6 +137,32 @@ record(fn::Function, ::Nothing, ::Type{T}, ::Ionic.AbstractReaction) where {T <:
 
 # --- Trace Visualization ---
 
+const IONIC_SRC_PATH = dirname(@__FILE__)
+
+function find_origin_frame(stack::Vector{Base.StackTraces.StackFrame})
+    for frame in stack
+        # Skip frames from files within the Ionic/src directory
+        if startswith(String(frame.file), IONIC_SRC_PATH)
+            continue
+        end
+        # This is the first frame outside of the Ionic source directory.
+        return frame
+    end
+    return stack[1] # Fallback
+end
+
+function isinternal(trace::Trace)
+    # Find the first frame outside of the Tracing module.
+    # If its path is still inside the Ionic/src directory, it's an internal call.
+    for frame in trace.stack
+        if String(frame.file) == @__FILE__
+            continue
+        end
+        return startswith(String(frame.file), IONIC_SRC_PATH)
+    end
+    return false
+end
+
 function format_time(ns)
     if ns < 1_000
         return "$ns ns"
@@ -151,26 +177,35 @@ end
 
 function Base.show(io::IO, ::MIME"text/plain", event::Get)
     printstyled(io, "GET"; color = :cyan)
+    if isinternal(event)
+        printstyled(io, " (internal)"; color=:light_black)
+    end
     println(io, " ($(format_time(event.stop - event.start)))")
     println(io, "  Value: ", event.value)
     printstyled(io, "  From: ", color = :light_black)
-    return println(io, event.stack[1])
+    return println(io, find_origin_frame(event.stack))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", event::Set)
     printstyled(io, "SET"; color = :magenta)
+    if isinternal(event)
+        printstyled(io, " (internal)"; color=:light_black)
+    end
     println(io, " ($(format_time(event.stop - event.start)))")
     println(io, "  New Value: ", event.value)
     printstyled(io, "  From: ", color = :light_black)
-    return println(io, event.stack[1])
+    return println(io, find_origin_frame(event.stack))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", event::Notify)
     printstyled(io, "NOTIFY"; color = :yellow)
+    if isinternal(event)
+        printstyled(io, " (internal)"; color=:light_black)
+    end
     println(io, " ($(format_time(event.stop - event.start)))")
     println(io, "  Reactions triggered: ", length(event.reactions))
     printstyled(io, "  From: ", color = :light_black)
-    return println(io, event.stack[1])
+    return println(io, find_origin_frame(event.stack))
 end
 
 function Base.show(io::IO, ::MIME"text/plain", event::Subscribe)
