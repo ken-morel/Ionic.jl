@@ -7,7 +7,7 @@ export AbstractReactive, Reactor
 export update!, alter!
 export @ionic, @reactor, @radical
 
-export trace!, gettrace, ReactiveVector, onchange
+export trace!, gettrace, ReactiveVector, oncollectionchange
 
 
 """

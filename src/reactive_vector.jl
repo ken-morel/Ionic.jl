@@ -145,12 +145,12 @@ end
 
 
 """
-    onchange(callback::Function, c::Catalyst, rv::ReactiveVector)
+    oncollectionchange(callback::Function, c::Catalyst, rv::ReactiveVector)
 
 Subscribes to a `ReactiveVector` with a callback that receives a batched list
 of `VectorChange{T}` events. The callback signature must be `(reactive, changes)`.
 """
-function onchange(
+function oncollectionchange(
         callback::Function,
         c::Catalyst,
         rv::ReactiveVector{T},
@@ -159,6 +159,23 @@ function onchange(
     add!(c, reaction)
     add!(rv, reaction)
     return reaction
+end
+
+"""
+    oncollectionchange(callback::Function, c::Catalyst, r::AbstractReactive{<:AbstractVector})
+
+Subscribes to any reactive vector (like a `Reactant{Vector{T}}`).
+The callback will receive a `[ReplaceAll(...)]` event on every change.
+"""
+function oncollectionchange(
+    callback::Function,
+    c::Catalyst,
+    r::AbstractReactive{V},
+) where {T, V <: AbstractVector{T}}
+    catalyze!(c, r) do reactive_vector
+        changes = [ReplaceAll{T}(getvalue(reactive_vector))]
+        callback(reactive_vector, changes)
+    end
 end
 
 Base.length(rv::ReactiveVector) = length(rv.value)
