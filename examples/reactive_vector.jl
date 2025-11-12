@@ -20,10 +20,10 @@ catalyze!(standard_catalyst, rv) do reactive_vector
     println("\n[Standard Listener] Notified! Current vector: ", reactive_vector[])
 end
 
-# 4. Granular subscription using `onchange`
+# 4. Granular subscription using `oncollectionchange`
 # This callback receives a list of specific change events that occurred.
 # This is highly efficient for UIs, allowing for precise updates.
-onchange(changes_catalyst, rv) do reactive_vector, changes
+oncollectionchange(changes_catalyst, rv) do reactive_vector, changes
     println("\n[Changes Listener] Received ", length(changes), " specific change(s): ")
     for change in changes
         if change isa Ionic.Push
@@ -47,7 +47,7 @@ end
 
 # Now, let's modify the ReactiveVector and see the listeners in action.
 
-println("\n--- Performing Operations ---")
+println("\n--- Performing Operations on ReactiveVector ---")
 
 # A. Push a new item
 println("\n1. Pushing 'cherries'...")
@@ -74,10 +74,36 @@ insert!(rv, 1, "blueberries")
 println("\n6. Emptying the vector...")
 empty!(rv)
 
+
+# --- Overload Example ---
+println("\n--- Using oncollectionchange with a standard Reactant{Vector} ---")
+
+# 1. Create a standard Reactant holding a Vector
+standard_rv = Reactant{Vector{Int}}([10, 20, 30])
+standard_rv_catalyst = Catalyst()
+
+# 2. Subscribe with oncollectionchange
+oncollectionchange(standard_rv_catalyst, standard_rv) do r, changes
+    println("\n[Standard Reactant Listener] Received change(s):")
+    for change in changes
+        if change isa Ionic.ReplaceAll
+            println("  - REPLACE ALL with new values: ", change.new_values)
+        else
+            println("  - Received unexpected change type: ", typeof(change))
+        end
+    end
+end
+
+# 3. Trigger a change. This will replace the whole vector.
+println("\n1. Replacing the entire vector...")
+standard_rv[] = [40, 50]
+
+
 # --- Cleanup ---
 # It's good practice to denature catalysts when they are no longer needed
 # to prevent memory leaks.
 denature!(standard_catalyst)
 denature!(changes_catalyst)
+denature!(standard_rv_catalyst)
 
 println("\n--- Example Finished ---")

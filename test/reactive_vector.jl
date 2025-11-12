@@ -29,13 +29,13 @@ using Test
         @test rv[] == [1]
     end
 
-    @testset "onchange Granular Notifications" begin
+    @testset "oncollectionchange Granular Notifications" begin
         rv = ReactiveVector{String}(["a", "b"])
         c = Catalyst()
         
         changes_received = []
         
-        onchange(c, rv) do _, changes
+        oncollectionchange(c, rv) do _, changes
             append!(changes_received, changes)
         end
 
@@ -93,6 +93,23 @@ using Test
         @test changes_received[1] isa Ionic.ReplaceAll
         @test changes_received[1].new_values == ["new", "vector"]
         @test rv[] == ["new", "vector"]
+    end
+
+    @testset "oncollectionchange on standard Reactant{Vector}" begin
+        r = Reactant{Vector{Int}}([1, 2, 3])
+        c = Catalyst()
+        changes_received = []
+
+        oncollectionchange(c, r) do _, changes
+            append!(changes_received, changes)
+        end
+
+        # Trigger a change
+        r[] = [4, 5, 6]
+
+        @test length(changes_received) == 1
+        @test changes_received[1] isa Ionic.ReplaceAll
+        @test changes_received[1].new_values == [4, 5, 6]
     end
 
 end
