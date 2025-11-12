@@ -77,7 +77,6 @@ function record(fn::Function, id::UInt, ::Type{T}) where {T <: Union{Get, Set}}
 end
 record(fn::Function, ::Nothing, ::Type{T}) where {T <: Union{Get, Set}} = fn()
 
-
 @kwdef struct Notify <: Trace
     stack::Vector{Base.StackTraces.StackFrame}
     start::UInt
@@ -90,7 +89,7 @@ function record(fn::Function, id::UInt, ::Type{Notify})
     start = time_ns()
     error = nothing
     stack = stacktrace()[2:end]
-    reactions::Ionic.AbstractReaction = Ionic.AbstractReaction[]
+    reactions = Ionic.AbstractReaction[]
     return try
         reactions = fn()
     catch e
@@ -135,5 +134,69 @@ function record(fn::Function, id::UInt, ::Type{T}, reaction::Ionic.AbstractReact
     return ret
 end
 record(fn::Function, ::Nothing, ::Type{T}, ::Ionic.AbstractReaction) where {T <: Union{Subscribe, Unsubscribe}} = fn()
+
+# --- Trace Visualization ---
+
+function format_time(ns)
+    if ns < 1_000
+        return "$ns ns"
+    elseif ns < 1_000_000
+        return "$(round(ns / 1_000, digits = 2)) μs"
+    elseif ns < 1_000_000_000
+        return "$(round(ns / 1_000_000, digits = 2)) ms"
+    else
+        return "$(round(ns / 1_000_000_000, digits = 2)) s"
+    end
+end
+
+function Base.show(io::IO, ::MIME"text/plain", event::Get)
+    printstyled(io, "GET"; color = :cyan)
+    println(io, " ($(format_time(event.stop - event.start)))")
+    println(io, "  Value: ", event.value)
+    printstyled(io, "  From: ", color = :light_black)
+    return println(io, event.stack[1])
+end
+
+function Base.show(io::IO, ::MIME"text/plain", event::Set)
+    printstyled(io, "SET"; color = :magenta)
+    println(io, " ($(format_time(event.stop - event.start)))")
+    println(io, "  New Value: ", event.value)
+    printstyled(io, "  From: ", color = :light_black)
+    return println(io, event.stack[1])
+end
+
+function Base.show(io::IO, ::MIME"text/plain", event::Notify)
+    printstyled(io, "NOTIFY"; color = :yellow)
+    println(io, " ($(format_time(event.stop - event.start)))")
+    println(io, "  Reactions triggered: ", length(event.reactions))
+    printstyled(io, "  From: ", color = :light_black)
+    return println(io, event.stack[1])
+end
+
+function Base.show(io::IO, ::MIME"text/plain", event::Subscribe)
+    printstyled(io, "SUBSCRIBE"; color = :green)
+    return println(io, " ($(format_time(event.stop - event.start)))")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", event::Unsubscribe)
+    printstyled(io, "UNSUBSCRIBE"; color = :red)
+    return println(io, " ($(format_time(event.stop - event.start)))")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", event::Inhibit)
+    printstyled(io, "INHIBIT"; color = :red)
+    return println(io, " ($(format_time(event.stop - event.start)))")
+end
+
+function Base.show(io::IO, m::MIME"text/plain", log::TraceLog)
+    println(io, "TraceLog for ", typeof(log.object), ":")
+    for (i, event) in enumerate(log.traces)
+        print(io, i, ". ")
+        show(io, m, event)
+    end
+    return
+end
+
+printtrace(l::TraceLog) = show(stdout, MIME("text/plain"), l)
 
 end

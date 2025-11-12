@@ -27,7 +27,7 @@ function getvalue(r::Reactant{T}) where {T}
 end
 
 function setvalue!(r::Reactant{T}, new_value; notify::Bool = true) where {T}
-    Trace.record(() -> @lock(r, r.value[] = convert(T, new_value)), r.trace, Trace.Set)
+    Tracing.record(() -> @lock(r, r.value[] = convert(T, new_value)), r.trace, Tracing.Set)
     notify && Base.notify(r)
     return new_value
 end

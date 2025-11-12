@@ -2,10 +2,20 @@ using Ionic
 
 c = Catalyst()
 
-reactant = Reactant(5)
+r = Reactant(1)
 
-trace!(reactant)
+trace!(r)
 
-reactor = @reactor rand(1, 1, reactant')
+catalyze!(c, r) do r
+    println("New value: ", r[])
+end
 
-println(Ionic.Tracing.TRACE)
+r[] = 2
+
+@radical rand(100, 100, r')
+
+r[] = 6
+
+r[] = 8
+
+Ionic.Tracing.printtrace(gettrace(r))
