@@ -6,40 +6,8 @@ export resolve, MayBeReactive
 export AbstractReactive, Reactor
 export update!, alter!
 export @ionic, @reactor, @radical
-export trace, clear_trace_log
 
-# Global tracing state
-const TRACING_ENABLED = Dict{AbstractReactive, Bool}()
-const TRACING_LOG = Vector{Any}() # Store (event_type, reactive, old_value, new_value, caller_frame)
-const TRACING_LOCK = ReentrantLock()
-
-"""
-    trace(r::AbstractReactive, enable::Bool=true)
-
-Enable or disable tracing for a specific reactive object.
-When tracing is enabled, `getvalue`, `setvalue!`, and `notify` operations
-on `r` will be logged to `Ionic.TRACING_LOG`.
-"""
-function trace(r::AbstractReactive, enable::Bool=true)
-    @lock TRACING_LOCK begin
-        if enable
-            TRACING_ENABLED[r] = true
-        else
-            delete!(TRACING_ENABLED, r)
-        end
-    end
-    return
-end
-
-"""
-    clear_trace_log()
-
-Clears the global tracing log.
-"""
-function clear_trace_log()
-    @lock TRACING_LOCK empty!(TRACING_LOG)
-    return
-end
+export trace!, gettrace
 
 
 """
@@ -68,6 +36,8 @@ catalyze!(::AbstractCatalyst, ::AbstractReactive, fn::Function; kw...) =
 abstract type AbstractReaction{T} end
 
 
+include("trace.jl")
+
 include("catalyst.jl")
 
 include("reaction.jl")
@@ -77,6 +47,7 @@ include("reactant.jl")
 include("reactor.jl")
 
 include("reactive.jl")
+
 
 include("transcribe.jl")
 

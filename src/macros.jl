@@ -33,7 +33,7 @@ macro reactor(expr, setter = nothing, usedeps = nothing)
         transcribe(setter).code
     end
     deps = something(usedeps, Expr(:vect, trans.gets...))
-    return esc(:(IonicEfus.Reactor{$type}(() -> $(trans.code), $setter, $deps)))
+    return esc(:(Reactor{$type}(() -> $(trans.code), $setter, $deps)))
 end
 
 """
@@ -54,7 +54,7 @@ macro radical(expr, usedeps = nothing, setter = nothing)
     end
     trans = transcribe(expr)
     setter = if !isnothing(setter)
-        IonicEfus.Ionic.transcribe(setter).code
+        Ionic.transcribe(setter).code
     end
     deps = something(usedeps, Expr(:vect, trans.gets...))
     return esc(:($Reactor{$type}(() -> $(trans.code), $setter, $deps; eager = true)))

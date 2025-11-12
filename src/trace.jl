@@ -28,6 +28,7 @@ function gettrace(id::UInt)
 end
 function createtrace(r::Ionic.AbstractReactive)
     return Base.acquire(TRACE_SM) do
+        global TRACE_COUNT
         id = TRACE_COUNT
         TRACE_COUNT += 1
         TRACE[id] = TraceLog(r)
@@ -51,7 +52,7 @@ end
 
 
 @kwdef struct Set <: Trace
-    value::T
+    value
     stack::Vector{Base.StackTraces.StackFrame}
     start::UInt
     stop::UInt
@@ -81,7 +82,7 @@ record(fn::Function, ::Nothing, ::Type{T}) where {T <: Union{Get, Set}} = fn()
     stack::Vector{Base.StackTraces.StackFrame}
     start::UInt
     stop::UInt
-    reactions::Vector{AbstractReaction}
+    reactions::Vector{Ionic.AbstractReaction}
     error::Union{Exception, Nothing}
 end
 
@@ -106,7 +107,7 @@ record(fn::Function, ::Nothing, ::Type{T}) where {T <: Trace} = fn()
     reaction::Ionic.AbstractReaction
 
     start::UInt
-    stop::UIntend
+    stop::UInt
 end
 
 @kwdef struct Unsubscribe <: Trace
@@ -126,14 +127,13 @@ function record(fn::Function, id::UInt, ::Type{Inhibit})
 end
 record(fn::Function, ::Nothing, ::Type{Inhibit}) = fn()
 
-function record(fn::Function, id::UInt, ::Type{T}, reaction::AbstractReaction) where {T <: Union{Subscribe, Unsubscribe}}
-    trace(id, T(; reaction))
+function record(fn::Function, id::UInt, ::Type{T}, reaction::Ionic.AbstractReaction) where {T <: Union{Subscribe, Unsubscribe}}
     start = time_ns()
     ret = fn()
     stop = time_ns()
     trace(id, T(; reaction, start, stop))
     return ret
 end
-record(fn::Function, ::Nothing, ::Type{T}, ::AbstractReaction) where {T <: Union{Subscribe, Unsubscribe}} = fn()
+record(fn::Function, ::Nothing, ::Type{T}, ::Ionic.AbstractReaction) where {T <: Union{Subscribe, Unsubscribe}} = fn()
 
 end
