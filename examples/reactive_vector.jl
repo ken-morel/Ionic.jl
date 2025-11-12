@@ -84,19 +84,40 @@ standard_rv_catalyst = Catalyst()
 
 # 2. Subscribe with oncollectionchange
 oncollectionchange(standard_rv_catalyst, standard_rv) do r, changes
-    println("\n[Standard Reactant Listener] Received change(s):")
+    println("\n[Standard Reactant Listener] Received $(length(changes)) change(s) from diffing:")
     for change in changes
-        if change isa Ionic.ReplaceAll
-            println("  - REPLACE ALL with new values: ", change.new_values)
+        if change isa Ionic.Insert
+            println("  - INSERTED value: $(change.value) at index: $(change.index)")
+        elseif change isa Ionic.DeleteAt
+            println("  - DELETED at index: $(change.index)")
         else
-            println("  - Received unexpected change type: ", typeof(change))
+            println("  - Received unexpected change type: $(typeof(change))")
         end
     end
 end
 
-# 3. Trigger a change. This will replace the whole vector.
-println("\n1. Replacing the entire vector...")
-standard_rv[] = [40, 50]
+# 3. Trigger a change. The diffing algorithm will detect the precise changes.
+println("\n1. Replacing the entire vector (will be diffed)...")
+standard_rv[] = [10, 50, 30] # Changed 20 to 50
+
+
+# --- Move Example ---
+println("\n--- Using move! to reorder items ---")
+move_rv = ReactiveVector{Symbol}([:a, :b, :c, :d])
+move_catalyst = Catalyst()
+
+oncollectionchange(move_catalyst, move_rv) do r, changes
+    println("\n[Move Listener] Received change(s):")
+    for change in changes
+        if change isa Ionic.Move
+            println("  - MOVE operation with pairs: $(change.moves)")
+        end
+    end
+    println("  Current vector is now: ", r[])
+end
+
+println("\n1. Moving item from index 2 to 4...")
+move!(move_rv, 2 => 4)
 
 
 # --- Cleanup ---
@@ -105,5 +126,6 @@ standard_rv[] = [40, 50]
 denature!(standard_catalyst)
 denature!(changes_catalyst)
 denature!(standard_rv_catalyst)
+denature!(move_catalyst)
 
 println("\n--- Example Finished ---")

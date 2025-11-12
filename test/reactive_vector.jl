@@ -87,16 +87,16 @@ using Test
         @test isempty(rv)
         empty!(changes_received)
 
-        # Test setvalue!
-        setvalue!(rv, ["new", "vector"])
+        # Test setvalue! with diffing
+        setvalue!(rv, ["a", "x", "z"])
         @test length(changes_received) == 1
-        @test changes_received[1] isa Ionic.ReplaceAll
-        @test changes_received[1].new_values == ["new", "vector"]
-        @test rv[] == ["new", "vector"]
+        @test changes_received[1] isa Ionic.Insert
+        @test changes_received[1].value == "x"
+        @test rv[] == ["a", "x", "z"]
     end
 
     @testset "oncollectionchange on standard Reactant{Vector}" begin
-        r = Reactant{Vector{Int}}([1, 2, 3])
+        r = Reactant{Vector{String}}(["a", "b", "c"])
         c = Catalyst()
         changes_received = []
 
@@ -104,12 +104,30 @@ using Test
             append!(changes_received, changes)
         end
 
-        # Trigger a change
-        r[] = [4, 5, 6]
+        # Trigger a change that involves inserts and deletes
+        r[] = ["a", "x", "c", "y"]
 
+        @test length(changes_received) == 3 # Delete 'b', Insert 'x', Insert 'y'
+        @test count(c -> c isa Ionic.DeleteAt && c.index == 2, changes_received) == 1
+        @test count(c -> c isa Ionic.Insert && c.value == "x", changes_received) == 1
+        @test count(c -> c isa Ionic.Insert && c.value == "y", changes_received) == 1
+    end
+
+    @testset "move! function" begin
+        rv = ReactiveVector{Int}([10, 20, 30, 40])
+        c = Catalyst()
+        changes_received = []
+
+        oncollectionchange(c, rv) do _, changes
+            append!(changes_received, changes)
+        end
+
+        move!(rv, 1 => 3) # Move item from index 1 to 3
+
+        @test rv[] == [20, 30, 10, 40]
         @test length(changes_received) == 1
-        @test changes_received[1] isa Ionic.ReplaceAll
-        @test changes_received[1].new_values == [4, 5, 6]
+        @test changes_received[1] isa Ionic.Move
+        @test changes_received[1].moves == [1 => 3]
     end
 
 end
