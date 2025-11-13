@@ -42,5 +42,6 @@ function transcribe(orig::Expr)::Transcription
     end
     return Transcription((expr, dependencies, dependents))
 end
+precompile(transcribe, (Expr,))
 
 transcribe(x) = Transcription((x, [], []))

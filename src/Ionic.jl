@@ -21,6 +21,8 @@ methods. And should have a .reactions attribute.
 """
 abstract type AbstractReactive{T} end
 
+abstract type BuiltinReactive{T} <: AbstractReactive{T} end #TODO: this
+
 Base.notify(::AbstractReactive) = error("Not implemented")
 
 Base.getindex(r::AbstractReactive) = getvalue(r)
@@ -32,6 +34,7 @@ catalyze!(::AbstractCatalyst, ::AbstractReactive, fn::Function; kw...) =
     error("Not implemented")
 
 abstract type AbstractReaction{T} end
+abstract type BuiltinReaction{T} <: AbstractReaction{T} end
 
 
 include("trace.jl")
@@ -102,7 +105,7 @@ the function receives the reactive's value
 and returns a new one.
 """
 function update!(fn::Function, r::AbstractReactive)
-    return @lock r setvalue(r, fn(getvalue(r)))
+    return @lock r setvalue!(r, fn(getvalue(r)))
 end
 
 """
@@ -137,7 +140,7 @@ function setvalue! end
 
 Synchronize the values of the given reactive values.
 """
-function sync!(c::AbstractCatalyst, reactives::AbstractReactive ...)
+function sync!(c::AbstractCatalyst, reactives::Vector{<:AbstractReactive})
     local from::AbstractReactive
     local notifier = Base.Lockable{Union{AbstractReactive, Nothing}, ReentrantLock}(
         nothing,
@@ -162,5 +165,11 @@ function sync!(c::AbstractCatalyst, reactives::AbstractReactive ...)
     end
     return
 end
+precompile(sync!, (Catalyst, Vector{BuiltinReactive}))
+precompile(sync!, (Catalyst, Vector{Reactant}))
+precompile(sync!, (Catalyst, Vector{Reactor}))
+precompile(sync!, (Catalyst, Vector{ReactiveVector}))
+sync!(c::AbstractCatalyst, reactives::AbstractReactive...) = sync!(c, collect(reactives))
+
 
 end # module Ionic

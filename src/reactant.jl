@@ -5,7 +5,7 @@ Reactants are the builtin base for reactivity. They
 contain a value of type `T`, a list of reactions and 
 notified all catalysts when it's setvalue! is called
 """
-mutable struct Reactant{T} <: AbstractReactive{T}
+mutable struct Reactant{T} <: BuiltinReactive{T}
     const value::Ref{T}
     const reactions::Vector{AbstractReaction{T}}
 
@@ -22,9 +22,8 @@ mutable struct Reactant{T} <: AbstractReactive{T}
 end
 
 
-function getvalue(r::Reactant{T}) where {T}
-    return Tracing.record(() -> r.value[], r.trace, Tracing.Get)
-end
+getvalue(r::Reactant{T}) where {T} = Tracing.record(() -> r.value[], r.trace, Tracing.Get)
+
 
 function setvalue!(r::Reactant{T}, new_value; notify::Bool = true) where {T}
     Tracing.record(() -> @lock(r, r.value[] = convert(T, new_value)), r.trace, Tracing.Set)

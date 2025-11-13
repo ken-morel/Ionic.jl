@@ -10,6 +10,7 @@ uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
 version = "1.11.0"
 
 [[deps.Ionic]]
+deps = ["Dates"]
 path = "."
 uuid = "1fe31619-e050-4c22-88e3-621fdf7467f4"
 version = "0.1.0"

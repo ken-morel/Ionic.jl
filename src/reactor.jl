@@ -9,7 +9,7 @@ A reactor is said to be `fouled` when one of it
 dependencies has changed, and the value was not 
 yet updated.
 """
-mutable struct Reactor{T} <: AbstractReactive{T}
+mutable struct Reactor{T} <: BuiltinReactive{T}
     const getter::Function
     const setter::Union{Function, Nothing}
     const content::Vector{AbstractReactive}
