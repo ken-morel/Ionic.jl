@@ -37,10 +37,10 @@ a = Reactant(5)
 # The `'` syntax makes this clean and automatic
 b = @reactor a' * 2
 
-println(b') #> 10
+println(b[]) #> 10
 
 # Change the source value
-a' = 10
+a[] = 10
 
 println(b[]) #> 20
 
@@ -90,7 +90,7 @@ A reactive value that is computed from other reactive values.
 
 **Constructors:**
 
--   `Reactor{T}(getter, [setter], [dependencies]; eager=false)`
+-   `Reactor{T}(getter, [setter, [dependencies]]; eager=false)`
 
 The `@reactor` and `@radical` macros are the most convenient way to create `Reactor`s.
 
@@ -102,12 +102,13 @@ width = Reactant(10)
 height = Reactant(5)
 
 # A lazy reactor for area
-area = @reactor width' * height'
+area = @reactor println("Area is ", width' * height') 
 
 # An eager reactor that prints on change
 _ = @radical println("Area is now $(area')")
 
 width[] = 20 # The radical reactor will trigger and print "Area is now 100"
+_ = area[] # getvalue triggers print
 ```
 
 ### `Catalyst`
@@ -203,8 +204,34 @@ rv[1] = "apricot"
 println("Changes: ", changes_received) #> [Replace("apricot", 1)]
 empty!(changes_received)
 
+rv[] = ["a", "b"] # triggers diff and causes changes to compute
+
 move!(rv, 2 => 1) # Move 'banana' from index 2 to 1
 println("Changes: ", changes_received) #> [Move([2 => 1])]
+```
+
+`oncollectionchange()` also support plain `AbstractReactive{AbstractVector{T}}`
+objects, in which case it subscribes to them and automatically diffs on
+every notification, the same diff is applied if a whole `ReactiveVector` is set
+using `setvalue!` or `[]`. In both cases, the first argument to the callback
+function is a function which computes changes, and which is safe, and even
+very much adviced to call in another thread to prevent blocking.
+
+```julia
+v = Reactant([1, 2, 3])
+c = Catalyst()
+oncollectionchange(c, v) do compute_changes, _
+    Threads.@spawn begin
+        for change in compute_changes()
+            println(change)
+        end
+    end
+end
+
+alter!(v) do value # emits Ionic.Push{Int}(...)
+    push!(value, 5)
+end
+v[] = [1] # emits Ionic.Pop{Int}(4)
 ```
 
 ### Reactivity Debugging Tools (Tracing)
@@ -240,6 +267,5 @@ r[] = 20 # This will generate a 'Set' event
 val = r[] # This will generate a 'Get' event
 
 log = gettrace(r)
-printtrace(log)
-# Output will show formatted Get and Set events with timestamps and stack traces.
+Ionic.printtrace(log)
 ```
