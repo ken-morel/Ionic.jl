@@ -6,9 +6,8 @@ end
     macro ionic(expr)
 
 Converts the given `ionic` expression to 
-the julia getter code.
-The code returns the evaluated expression.
-
+the julia getter code, wrapping the modified variables in
+a batch() call, if the expression is a function, it wraps it's content.
 See also [`@reactor`](@ref)
 """
 macro ionic(expr)

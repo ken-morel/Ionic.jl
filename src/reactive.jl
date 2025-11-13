@@ -53,6 +53,7 @@ function trace!(c::BuiltinReactive, trace::Bool = true)
             c.trace = Tracing.createtrace(c)
         elseif !trace && !isnothing(c.trace)
             c.trace = nothing
+            gettrace(c)
         end
     end
 end
