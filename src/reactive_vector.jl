@@ -75,6 +75,7 @@ function _perform_lcs_diff(old_list::AbstractVector{T}, new_list::AbstractVector
     reverse!(raw_changes)
     return raw_changes
 end
+precompile(_perform_lcs_diff, (Vector{String}, Vector{String}))
 
 function _optimize_for_replace(changes::Vector{VectorChange{T}}) where {T}
     optimized_changes = Vector{VectorChange{T}}()
@@ -103,10 +104,11 @@ function _optimize_for_replace(changes::Vector{VectorChange{T}}) where {T}
     end
     return optimized_changes
 end
+precompile(_optimize_for_replace, (Vector{VectorChange{String}},))
 
 function _optimize_for_push_pop(changes::Vector{VectorChange{T}}, old_len::Int, new_len::Int) where {T}
     optimized_changes = Vector{VectorChange{T}}()
-    
+
     # Group sequential trailing inserts into a single Push
     trailing_inserts = []
     last_insert_idx = new_len
@@ -144,9 +146,10 @@ function _optimize_for_push_pop(changes::Vector{VectorChange{T}}, old_len::Int, 
         push!(changes, Pop{T}(trailing_deletes))
     end
     reverse!(changes)
-    
+
     return changes
 end
+precompile(_optimize_for_push_pop, (Vector{VectorChange{String}}, Int, Int))
 
 function _optimize_for_move(changes::Vector{VectorChange{T}}, old_list::AbstractVector{T}) where {T}
     final_changes = Vector{VectorChange{T}}()
@@ -175,6 +178,7 @@ function _optimize_for_move(changes::Vector{VectorChange{T}}, old_list::Abstract
 
     return final_changes
 end
+precompile(_optimize_for_move, (Vector{VectorChange{String}}, Vector{String}))
 
 function _diff_vectors(old_list::AbstractVector{T}, new_list::AbstractVector{T}) where {T}
     raw_changes = _perform_lcs_diff(old_list, new_list)
@@ -183,6 +187,7 @@ function _diff_vectors(old_list::AbstractVector{T}, new_list::AbstractVector{T})
     move_optimized = _optimize_for_move(push_pop_optimized, old_list)
     return move_optimized
 end
+precompile(_diff_vectors, (Vector{String}, Vector{String}))
 
 """
 A specialized reaction for `ReactiveVector` that receives a list of `VectorChange{T}` events.
@@ -202,7 +207,7 @@ A reactive wrapper around a `Vector{T}` that emits granular change events.
 Subscribers can use `oncollectionchange` to receive a list of all changes
 that occurred within a single notification cycle.
 """
-mutable struct ReactiveVector{T} <: AbstractReactive{Vector{T}}
+mutable struct ReactiveVector{T} <: BuiltinReactive{Vector{T}}
     value::Vector{T}
     const reactions::Vector{AbstractReaction{Vector{T}}}
     const lock::ReentrantLock
@@ -223,25 +228,19 @@ Move item to new locations
 """
 function move!(rv::ReactiveVector{T}, moves::Pair{Int, Int}...) where {T}
     @lock rv begin
-        # Create a temporary copy of the current value to perform moves
-        # This helps in handling multiple moves without affecting indices of subsequent moves
-        # if they refer to original positions.
-        current_value = copy(rv.value)
-
-        # For each move, remove the item from its 'from' position and insert it at the 'to' position.
-        # This is a simplified approach. For complex, overlapping moves, a more sophisticated
-        # algorithm (e.g., based on permutation cycles) might be needed.
         for (from, to) in moves
-            if from < 1 || from > length(current_value) || to < 1 || to > length(current_value) + 1
-                throw(BoundsError(current_value, max(from, to)))
+            if from < 1 || from > length(rv.value) || to < 1 || to > length(rv.value) + 1
+                throw(BoundsError(rv.value, max(from, to)))
             end
-            item = splice!(current_value, from) # Remove item from 'from'
-            splice!(current_value, to:(to - 1), [item]) # Insert item at 'to'
+
+            item = rv.value[from]
+            deleteat!(rv.value, from)
+            insert!(rv.value, to, item)
         end
-        rv.value = current_value
     end
     return notify(rv, [Move{T}(collect(moves))])
 end
+precompile(move!, (ReactiveVector{String}, Pair{Int, Int}))
 
 
 function setvalue!(rv::ReactiveVector{T}, new_value; notify::Bool = true) where {T}
@@ -257,7 +256,10 @@ function setvalue!(rv::ReactiveVector{T}, new_value; notify::Bool = true) where 
     end
     return rv
 end
+precompile(setvalue!, (ReactiveVector{String}, Vector{String}))
+
 getvalue(rv::ReactiveVector) = Tracing.record(() -> @lock(rv, rv.value), rv.trace, Tracing.Get)
+precompile(getvalue, (ReactiveVector{String},))
 
 
 function Base.notify(rv::ReactiveVector{T}, changes::Vector{<:VectorChange{T}}) where {T}
@@ -276,12 +278,16 @@ function Base.notify(rv::ReactiveVector{T}, changes::Vector{<:VectorChange{T}}) 
     end
     return
 end
+precompile(notify, (ReactiveVector{String}, Vector{VectorChange{String}}))
 
 function Base.notify(rv::ReactiveVector{T}, change::VectorChange{T}) where {T}
     return notify(rv, [change])
 end
+precompile(notify, (ReactiveVector{String}, Push{String}))
+
 
 Base.notify(rv::ReactiveVector{T}) where {T} = notify(rv, _diff_vectors(rv.value, rv.value))
+precompile(notify, (ReactiveVector{String},))
 
 
 function Base.push!(rv::ReactiveVector{T}, items...) where {T}
@@ -290,12 +296,14 @@ function Base.push!(rv::ReactiveVector{T}, items...) where {T}
     Base.notify(rv, Push{T}(collect(val)))
     return rv
 end
+precompile(push!, (ReactiveVector{String}, String))
 
 function Base.pop!(rv::ReactiveVector{T}) where {T}
     val = @lock rv pop!(rv.value)
     Base.notify(rv, Pop{T}(1))
     return val
 end
+precompile(pop!, (ReactiveVector{String},))
 
 function Base.setindex!(rv::ReactiveVector{T}, value, index::Int) where {T}
     val = convert(T, value)
@@ -303,12 +311,14 @@ function Base.setindex!(rv::ReactiveVector{T}, value, index::Int) where {T}
     Base.notify(rv, SetIndex{T}(val, index))
     return rv
 end
+precompile(setindex!, (ReactiveVector{String}, String, Int))
 
 function Base.deleteat!(rv::ReactiveVector{T}, index::Int) where {T}
     @lock rv deleteat!(rv.value, index)
     Base.notify(rv, DeleteAt{T}(index))
     return rv
 end
+precompile(deleteat!, (ReactiveVector{String}, Int))
 
 function Base.insert!(rv::ReactiveVector{T}, index::Int, value) where {T}
     val = convert(T, value)
@@ -316,12 +326,14 @@ function Base.insert!(rv::ReactiveVector{T}, index::Int, value) where {T}
     Base.notify(rv, Insert{T}(val, index))
     return rv
 end
+precompile(insert!, (ReactiveVector{String}, Int, String))
 
 function Base.empty!(rv::ReactiveVector{T}) where {T}
     @lock rv empty!(rv.value)
     Base.notify(rv, Empty{T}())
     return rv
 end
+precompile(empty!, (ReactiveVector{String},))
 
 
 """
@@ -340,6 +352,7 @@ function oncollectionchange(
     add!(rv, reaction)
     return reaction
 end
+precompile(oncollectionchange, (Function, Catalyst, ReactiveVector{String}))
 
 """
     oncollectionchange(callback::Function, c::Catalyst, r::AbstractReactive{<:AbstractVector})
@@ -362,6 +375,7 @@ function oncollectionchange(
         end
     end
 end
+precompile(oncollectionchange, (Function, Catalyst, Reactant{Vector{String}}))
 
 
 Base.length(rv::ReactiveVector) = length(rv.value)

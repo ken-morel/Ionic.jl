@@ -21,6 +21,8 @@ methods. And should have a .reactions attribute.
 """
 abstract type AbstractReactive{T} end
 
+abstract type BuiltinReactive{T} <: AbstractReactive{T} end #TODO: this
+
 Base.notify(::AbstractReactive) = error("Not implemented")
 
 Base.getindex(r::AbstractReactive) = getvalue(r)
@@ -102,7 +104,7 @@ the function receives the reactive's value
 and returns a new one.
 """
 function update!(fn::Function, r::AbstractReactive)
-    return @lock r setvalue(r, fn(getvalue(r)))
+    return @lock r setvalue!(r, fn(getvalue(r)))
 end
 
 """
@@ -161,6 +163,14 @@ function sync!(c::AbstractCatalyst, reactives::AbstractReactive ...)
         end
     end
     return
+end
+
+using PrecompileTools
+
+@setup_workload begin
+    @compile_workload begin
+        include("precompile_workload.jl")
+    end
 end
 
 end # module Ionic

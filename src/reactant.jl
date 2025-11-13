@@ -5,7 +5,7 @@ Reactants are the builtin base for reactivity. They
 contain a value of type `T`, a list of reactions and 
 notified all catalysts when it's setvalue! is called
 """
-mutable struct Reactant{T} <: AbstractReactive{T}
+mutable struct Reactant{T} <: BuiltinReactive{T}
     const value::Ref{T}
     const reactions::Vector{AbstractReaction{T}}
 
