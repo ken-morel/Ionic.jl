@@ -35,8 +35,8 @@ using Test
         
         changes_received = []
         
-        oncollectionchange(c, rv) do _, changes
-            append!(changes_received, changes)
+        oncollectionchange(c, rv) do _, get_changes
+            append!(changes_received, get_changes())
         end
 
         # Test push!
@@ -104,8 +104,8 @@ using Test
         c = Catalyst()
         changes_received = []
 
-        oncollectionchange(c, r) do _, changes
-            append!(changes_received, changes)
+        oncollectionchange(c, r) do _, get_changes
+            append!(changes_received, get_changes())
         end
 
         # Trigger a change that should be detected as a Replace
@@ -122,8 +122,8 @@ using Test
         c = Catalyst()
         changes_received = []
 
-        oncollectionchange(c, rv) do _, changes
-            append!(changes_received, changes)
+        oncollectionchange(c, rv) do _, get_changes
+            append!(changes_received, get_changes())
         end
 
         move!(rv, 1 => 3) # Move item from index 1 to 3
