@@ -63,7 +63,7 @@ using Test
         notifications = Ref(0)
         changes_received = Vector{Ionic.VectorChange{Int}}()
 
-        oncollectionchange(c, rv) do _, get_changes
+        oncollectionchange(c, rv) do get_changes, _
             notifications[] += 1
             append!(changes_received, get_changes())
         end
