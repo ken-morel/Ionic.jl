@@ -77,11 +77,11 @@ using Test
             rv[2] = 99
         end
 
-        @test rv[] == [0, 99, 3]
+        @test rv[] == [0, 99, 2, 3]
         @test notifications[] == 1 # Should only notify once
         @test !isempty(changes_received)
         @test length(changes_received) > 1 # Should contain multiple batched changes
-        @test changes_received[1] isa Push
-        @test changes_received[end] isa Replace # The last change should be the result of rv[2] = 99
+        @test changes_received[1] isa Ionic.Push
+        @test changes_received[end] isa Ionic.SetIndex # The last change should be the result of rv[2] = 99
     end
 end
