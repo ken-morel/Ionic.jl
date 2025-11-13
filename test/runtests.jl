@@ -240,3 +240,7 @@ end
     constant_reactor = Reactor{Int}(() -> 42, nothing, AbstractReactive[])
     @test getvalue(constant_reactor) == 42
 end
+
+@testset "ReactiveVector" begin
+    include("reactive_vector.jl")
+end
