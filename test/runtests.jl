@@ -245,6 +245,6 @@ end
     include("reactive_vector.jl")
 end
 
-@testset "Transaction" begin
-    include("transaction.jl")
+@testset "Batch" begin
+    include("batch.jl")
 end

@@ -14,10 +14,7 @@ export @ionic, @reactor, @radical
 
 export trace!, gettrace, ReactiveVector, oncollectionchange, move!
 
-export transaction, flush! # Export new transaction functions
-
-
-
+export batch, fire!, batch!, resume! # Export new batching functions
 
 
 """
@@ -41,19 +38,15 @@ methods. And should have a .reactions attribute.
 abstract type AbstractReactive{T} end
 
 
-
 abstract type BuiltinReactive{T} <: AbstractReactive{T} end #TODO: this
-
 
 
 Base.notify(::AbstractReactive) = error("Not implemented")
 
 
-
 Base.getindex(r::AbstractReactive) = getvalue(r)
 
 Base.setindex!(r::AbstractReactive, v) = setvalue!(r, v)
-
 
 
 abstract type AbstractCatalyst end
@@ -65,50 +58,29 @@ catalyze!(::AbstractCatalyst, ::AbstractReactive, fn::Function; kw...) =
     error("Not implemented")
 
 
-
 abstract type AbstractReaction{T} end
 
 abstract type BuiltinReaction{T} <: AbstractReaction{T} end
 
-
-
-
-
 include("trace.jl")
-
-
 
 include("catalyst.jl")
 
-
-
 include("reaction.jl")
-
-
 
 include("reactant.jl")
 
-
-
 include("reactor.jl")
-
-
 
 include("reactive_vector.jl")
 
 
-
-include("transaction.jl") # Include the new transaction file
-
+include("batch.jl")
 
 
 include("reactive.jl")
 
-
-
 include("transcribe.jl")
-
-
 
 include("macros.jl")
 

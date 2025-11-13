@@ -12,9 +12,8 @@ This is useful for performance when making multiple changes to reactive objects 
 ```julia
 r1 = Reactant(1)
 r2 = Reactant(2)
-catalyze!((r1, r2)) do _, _
-    println("Sum: ", r1[] + r2[])
-end
+
+@radical println("Sum: ", r1' + r2')
 
 batch(r1, r2) do
     r1[] = 10 # No notification yet
@@ -24,21 +23,12 @@ end
 ```
 """
 function batch(f::Function, reactives::AbstractReactive...)
-    # Defer notifications for all specified reactives
-    for r in reactives
-        batch!(r)
-    end
 
-    try
-        f() # Run the user's code
+    foreach(batch!, reactives)
+    return try
+        f()
     finally
-        # Decrement defer level and fire
-        for r in reactives
-            resume!(r)
-            if r.defer_level == 0
-                fire!(r)
-            end
-        end
+        foreach(resume!, reactives)
     end
 end
 

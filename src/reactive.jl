@@ -13,7 +13,7 @@ Remove the reaction from the reactive object(thread safe)
 remove!(a::BuiltinReactive{T}, r::AbstractReaction{T}) where {T} = Tracing.record(() -> @lock(a, filter!(o -> o !== r, a.reactions)), a.trace, Tracing.Unsubscribe, r)
 
 
-function Base.notify(@nospecialize(r::BuiltinReactive))
+function Base.notify(r::BuiltinReactive)
     return length(
         Tracing.record(r.trace, Tracing.Notify) do
             reactions = @lock r copy(r.reactions)
@@ -28,12 +28,12 @@ precompile(Base.notify, (BuiltinReactive,))
 
 
 for fn in [:lock, :trylock, :unlock]
-    @eval Base.$fn(@nospecialize(r::BuiltinReactive)) = Base.$fn(r.lock)
+    @eval Base.$fn(r::BuiltinReactive) = Base.$fn(r.lock)
     @eval precompile(Base.$fn, (BuiltinReactive,))
 end
 
 
-function inhibit!(@nospecialize(r::BuiltinReactive))
+function inhibit!(r::BuiltinReactive)
     return Tracing.record(() -> @lock(r, foreach(inhibit!, copy(r.reactions))), r.trace, Tracing.Inhibit)
 end
 precompile(inhibit!, (BuiltinReactive,))
@@ -43,7 +43,7 @@ precompile(inhibit!, (BuiltinReactive,))
 
 Know if tracing is activated for the reactive object.
 """
-istraced(@nospecialize(c::BuiltinReactive)) = !isnothing(c.trace)
+istraced(c::BuiltinReactive) = !isnothing(c.trace)
 precompile(istraced, (BuiltinReactive,))
 
 
@@ -56,16 +56,19 @@ function trace!(c::BuiltinReactive, trace::Bool = true)
         end
     end
 end
-gettrace(@nospecialize(c::BuiltinReactive)) = isnothing(c.trace) ? nothing : Tracing.gettrace(c.trace)
+gettrace(c::BuiltinReactive) = isnothing(c.trace) ? nothing : Tracing.gettrace(c.trace)
 precompile(gettrace, (BuiltinReactive,))
 
-# --- API for batching notifications ---
 
 batch!(r::BuiltinReactive) = @lock r r.defer_level += 1
-resume!(r::BuiltinReactive) = @lock r r.defer_level -= 1
-
+function resume!(r::BuiltinReactive; fire::Bool = true)
+    @lock r r.defer_level -= 1
+    return if r.defer_level == 0 && fire
+        fire!(r)
+    end
+end
 function fire!(r::BuiltinReactive)
-    if r.needs_notification
+    return if r.needs_notification
         r.needs_notification = false
         Base.notify(r)
     end

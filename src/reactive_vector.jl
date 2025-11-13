@@ -228,7 +228,7 @@ end
 
 Move item to new locations
 """
-function move!(@nospecialize(rv::ReactiveVector{T}), moves::Pair{Int, Int}...) where {T}
+function move!(rv::ReactiveVector{T}, moves::Pair{Int, Int}...) where {T}
     @lock rv begin
         for (from, to) in moves
             if from < 1 || from > length(rv.value) || to < 1 || to > length(rv.value) + 1
@@ -242,9 +242,6 @@ function move!(@nospecialize(rv::ReactiveVector{T}), moves::Pair{Int, Int}...) w
     end
     return Base.notify(rv, [Move{T}(collect(moves))])
 end
-precompile(move!, (ReactiveVector{Any}, Pair{Int, Int}))
-precompile(move!, (ReactiveVector{Any}, Pair{Int, Int}, Pair{Int, Int}))
-precompile(move!, (ReactiveVector{Any}, Pair{Int, Int}, Pair{Int, Int}, Pair{Int, Int}))
 
 
 function setvalue!(rv::ReactiveVector{T}, new_value; notify::Bool = true) where {T}
@@ -260,10 +257,9 @@ function setvalue!(rv::ReactiveVector{T}, new_value; notify::Bool = true) where 
     end
     return rv
 end
-precompile(setvalue!, (ReactiveVector{String}, Vector{String}))
 
-getvalue(@nospecialize(rv::ReactiveVector)) = Tracing.record(() -> @lock(rv, rv.value), rv.trace, Tracing.Get)
-precompile(getvalue, (ReactiveVector{Any},))
+getvalue(rv::ReactiveVector) = Tracing.record(() -> @lock(rv, rv.value), rv.trace, Tracing.Get)
+precompile(getvalue, (ReactiveVector,))
 
 
 function Base.notify(rv::ReactiveVector{T}, changes::Vector{<:VectorChange{T}}) where {T}
@@ -287,42 +283,36 @@ function Base.notify(rv::ReactiveVector{T}, changes::Vector{<:VectorChange{T}}) 
     end
     return
 end
-precompile(notify, (ReactiveVector{Any}, Vector{VectorChange{Any}}))
 
 function Base.notify(rv::ReactiveVector{T}, change::VectorChange{T}) where {T}
     return Base.notify(rv, [change])
 end
-precompile(notify, (ReactiveVector{Any}, Push{Any}))
 
 
-Base.notify(rv::ReactiveVector{T}) where {T} = Base.notify(rv, _diff_vectors(rv.value, rv.value))
-precompile(notify, (ReactiveVector{Any},))
+Base.notify(rv::ReactiveVector) = Base.notify(rv, _diff_vectors(rv.value, rv.value))
+precompile(Base.notify, (ReactiveVector,))
 
-function flush!(rv::ReactiveVector)
+function fire!(rv::ReactiveVector)
     return if !isempty(rv.pending_changes)
         changes_to_send = copy(rv.pending_changes)
         empty!(rv.pending_changes)
         Base.notify(rv, changes_to_send)
     end
 end
+precompile(fire!, (ReactiveVector,))
 
 
-function Base.push!(@nospecialize(rv::ReactiveVector{T}), items...) where {T}
+function Base.push!(rv::ReactiveVector{T}, items...) where {T}
     val = convert.(T, items)
     @lock rv push!(rv.value, items...)
     Base.notify(rv, Push{T}(collect(val)))
     return rv
 end
-precompile(push!, (ReactiveVector{Any}, Any))
-precompile(push!, (ReactiveVector{Any}, Any, Any))
-precompile(push!, (ReactiveVector{Any}, Any, Any, Any))
-
-function Base.pop!(@nospecialize(rv::ReactiveVector{T})) where {T}
+function Base.pop!(rv::ReactiveVector{T}) where {T}
     val = @lock rv pop!(rv.value)
     Base.notify(rv, Pop{T}(1))
     return val
 end
-precompile(pop!, (ReactiveVector{Any},))
 
 function Base.setindex!(rv::ReactiveVector{T}, value, index::Int) where {T}
     val = convert(T, value)
@@ -330,14 +320,12 @@ function Base.setindex!(rv::ReactiveVector{T}, value, index::Int) where {T}
     Base.notify(rv, SetIndex{T}(val, index))
     return rv
 end
-precompile(setindex!, (ReactiveVector{Any}, Any, Int))
 
 function Base.deleteat!(rv::ReactiveVector{T}, index::Int) where {T}
     @lock rv deleteat!(rv.value, index)
     Base.notify(rv, DeleteAt{T}(index))
     return rv
 end
-precompile(deleteat!, (ReactiveVector{String}, Int))
 
 function Base.insert!(rv::ReactiveVector{T}, index::Int, value) where {T}
     val = convert(T, value)
@@ -345,14 +333,12 @@ function Base.insert!(rv::ReactiveVector{T}, index::Int, value) where {T}
     Base.notify(rv, Insert{T}(val, index))
     return rv
 end
-precompile(insert!, (ReactiveVector{String}, Int, String))
 
 function Base.empty!(rv::ReactiveVector{T}) where {T}
     @lock rv empty!(rv.value)
     Base.notify(rv, Empty{T}())
     return rv
 end
-precompile(empty!, (ReactiveVector{String},))
 
 
 """

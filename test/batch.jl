@@ -1,8 +1,8 @@
 using Ionic
 using Test
 
-@testset "Transaction" begin
-    @testset "Reactant Transaction" begin
+@testset "Batch" begin
+    @testset "Reactant Batch" begin
         r = Reactant(0)
         c = Catalyst()
         notifications = Ref(0)
@@ -13,7 +13,7 @@ using Test
 
         @test notifications[] == 0
 
-        transaction(r) do
+        batch(r) do
             r[] = 1
             r[] = 2
             r[] = 3
@@ -22,19 +22,19 @@ using Test
         @test r[] == 3
         @test notifications[] == 1 # Should only notify once
         
-        # Test nested transactions
-        transaction(r) do
+        # Test nested batches
+        batch(r) do
             r[] = 4
-            transaction(r) do
+            batch(r) do
                 r[] = 5
             end
             r[] = 6
         end
         @test r[] == 6
-        @test notifications[] == 2 # Notified once for each top-level transaction
+        @test notifications[] == 2 # Notified once for each top-level batch
     end
 
-    @testset "Reactor Transaction" begin
+    @testset "Reactor Batch" begin
         r1 = Reactant(1)
         r2 = Reactant(2)
         reactor = Reactor(() -> r1[] + r2[], nothing, [r1, r2])
@@ -47,7 +47,7 @@ using Test
 
         @test notifications[] == 0
 
-        transaction(r1, r2, reactor) do
+        batch(r1, r2, reactor) do
             r1[] = 10
             r2[] = 20
             # reactor should not notify yet
@@ -57,7 +57,7 @@ using Test
         @test notifications[] == 1 # Should only notify once
     end
 
-    @testset "ReactiveVector Transaction" begin
+    @testset "ReactiveVector Batch" begin
         rv = ReactiveVector{Int}([1, 2, 3])
         c = Catalyst()
         notifications = Ref(0)
@@ -70,7 +70,7 @@ using Test
 
         @test notifications[] == 0
 
-        transaction(rv) do
+        batch(rv) do
             push!(rv, 4)
             pop!(rv)
             insert!(rv, 1, 0)
