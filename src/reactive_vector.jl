@@ -181,11 +181,24 @@ Move item to new locations
 """
 function move!(rv::ReactiveVector{T}, moves::Pair{Int, Int}...) where {T}
     @lock rv begin
+        # Create a temporary copy of the current value to perform moves
+        # This helps in handling multiple moves without affecting indices of subsequent moves
+        # if they refer to original positions.
+        current_value = copy(rv.value)
+        
+        # For each move, remove the item from its 'from' position and insert it at the 'to' position.
+        # This is a simplified approach. For complex, overlapping moves, a more sophisticated
+        # algorithm (e.g., based on permutation cycles) might be needed.
         for (from, to) in moves
-            rv.value[to] = rv.value[from]
+            if from < 1 || from > length(current_value) || to < 1 || to > length(current_value) + 1
+                throw(BoundsError(current_value, max(from, to)))
+            end
+            item = splice!(current_value, from) # Remove item from 'from'
+            splice!(current_value, to:to-1, [item]) # Insert item at 'to'
         end
+        rv.value = current_value
     end
-    return notify(rv, [Move{T}(moves |> collect)])
+    return notify(rv, [Move{T}(collect(moves))])
 end
 
 
