@@ -43,7 +43,7 @@ using Test
         push!(rv, "c")
         @test length(changes_received) == 1
         @test changes_received[1] isa Ionic.Push
-        @test changes_received[1].value == "c"
+        @test changes_received[1].values == ["c"]
         @test rv[] == ["a", "b", "c"]
         empty!(changes_received)
 
@@ -51,6 +51,7 @@ using Test
         pop!(rv)
         @test length(changes_received) == 1
         @test changes_received[1] isa Ionic.Pop
+        @test changes_received[1].count == 1
         @test rv[] == ["a", "b"]
         empty!(changes_received)
 
@@ -87,12 +88,15 @@ using Test
         @test isempty(rv)
         empty!(changes_received)
 
-        # Test setvalue! with diffing
-        setvalue!(rv, ["a", "x", "z"])
+        # Test setvalue! with diffing (now a Replace event)
+        rv[] = ["x", "w"] # Start with a known state
+        empty!(changes_received)
+        setvalue!(rv, ["x", "y"])
         @test length(changes_received) == 1
-        @test changes_received[1] isa Ionic.Insert
-        @test changes_received[1].value == "x"
-        @test rv[] == ["a", "x", "z"]
+        @test changes_received[1] isa Ionic.Replace
+        @test changes_received[1].value == "y"
+        @test changes_received[1].index == 2
+        @test rv[] == ["x", "y"]
     end
 
     @testset "oncollectionchange on standard Reactant{Vector}" begin
@@ -104,13 +108,13 @@ using Test
             append!(changes_received, changes)
         end
 
-        # Trigger a change that involves inserts and deletes
-        r[] = ["a", "x", "c", "y"]
+        # Trigger a change that should be detected as a Replace
+        r[] = ["a", "x", "c"]
 
-        @test length(changes_received) == 3 # Delete 'b', Insert 'x', Insert 'y'
-        @test count(c -> c isa Ionic.DeleteAt && c.index == 2, changes_received) == 1
-        @test count(c -> c isa Ionic.Insert && c.value == "x", changes_received) == 1
-        @test count(c -> c isa Ionic.Insert && c.value == "y", changes_received) == 1
+        @test length(changes_received) == 1
+        @test changes_received[1] isa Ionic.Replace
+        @test changes_received[1].value == "x"
+        @test changes_received[1].index == 2
     end
 
     @testset "move! function" begin

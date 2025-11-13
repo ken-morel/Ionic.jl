@@ -38,6 +38,13 @@ struct Empty{T} <: VectorChange{T}
 end
 public Empty
 
+"Event representing replacing an item at a specific index."
+struct Replace{T} <: VectorChange{T}
+    value::T
+    index::Int
+end
+public Replace
+
 "Event representing `setvalue!(vector, new_values)`."
 struct Move{T} <: VectorChange{T}
     moves::Vector{Pair{Int, Int}}
@@ -68,63 +75,91 @@ function _diff_vectors(old_list::AbstractVector{T}, new_list::AbstractVector{T})
     end
     reverse!(raw_changes)
 
-    # Pass 2: Consolidate trailing Inserts/Deletes into Push/Pop
-    optimized_changes = Vector{VectorChange{T}}()
+    # Pass 2: Consolidate DeleteAt and Insert at the same index into Replace
+    replace_optimized_changes = Vector{VectorChange{T}}()
+    processed_indices = Set{Int}() # To track changes that have been processed
+
+    for i in 1:length(raw_changes)
+        change1 = raw_changes[i]
+        if change1 isa DeleteAt && !(i in processed_indices)
+            found_replace = false
+            for j in (i + 1):length(raw_changes)
+                change2 = raw_changes[j]
+                if change2 isa Insert && change1.index == change2.index && !(j in processed_indices)
+                    push!(replace_optimized_changes, Replace{T}(change2.value, change1.index))
+                    push!(processed_indices, i)
+                    push!(processed_indices, j)
+                    found_replace = true
+                    break
+                end
+            end
+            if !found_replace
+                push!(replace_optimized_changes, change1)
+                push!(processed_indices, i)
+            end
+        elseif !(i in processed_indices)
+            push!(replace_optimized_changes, change1)
+            push!(processed_indices, i)
+        end
+    end
+
+    # Pass 3: Consolidate trailing Inserts/Deletes into Push/Pop
+    optimized_changes_after_replace = Vector{VectorChange{T}}()
 
     # Group sequential trailing inserts into a single Push
     trailing_inserts = []
     last_insert_idx = new_len
-    temp_changes = copy(raw_changes) # Work on a copy
-    empty!(raw_changes)
+    temp_changes = copy(replace_optimized_changes) # Work on a copy
+    empty!(replace_optimized_changes) # Clear for re-population
 
     for change in reverse(temp_changes)
         if change isa Insert && change.index == last_insert_idx
             push!(trailing_inserts, change.value)
             last_insert_idx -= 1
         else
-            push!(raw_changes, change)
+            push!(replace_optimized_changes, change)
         end
     end
     if !isempty(trailing_inserts)
-        push!(raw_changes, Push{T}(reverse(trailing_inserts)))
+        push!(replace_optimized_changes, Push{T}(reverse(trailing_inserts)))
     end
-    reverse!(raw_changes)
+    reverse!(replace_optimized_changes)
 
     # Group sequential trailing deletes into a single Pop
     trailing_deletes = 0
     last_delete_idx = old_len
-    temp_changes = copy(raw_changes)
-    empty!(raw_changes)
+    temp_changes = copy(replace_optimized_changes)
+    empty!(replace_optimized_changes)
 
     for change in reverse(temp_changes)
         if change isa DeleteAt && change.index == last_delete_idx
             trailing_deletes += 1
             last_delete_idx -= 1
         else
-            push!(raw_changes, change)
+            push!(replace_optimized_changes, change)
         end
     end
     if trailing_deletes > 0
-        push!(raw_changes, Pop{T}(trailing_deletes))
+        push!(replace_optimized_changes, Pop{T}(trailing_deletes))
     end
-    reverse!(raw_changes)
+    reverse!(replace_optimized_changes)
 
-    optimized_changes = raw_changes
+    optimized_changes_after_replace = replace_optimized_changes
 
-    # Pass 3: Find Delete/Insert pairs and convert them to Move events
+    # Pass 4: Find Delete/Insert pairs and convert them to Move events
     final_changes = Vector{VectorChange{T}}()
     moved_items = Dict() # Dict to track items that are part of a move
 
-    for i in 1:length(optimized_changes)
-        change1 = optimized_changes[i]
+    for i in 1:length(optimized_changes_after_replace)
+        change1 = optimized_changes_after_replace[i]
         if change1 isa DeleteAt && !haskey(moved_items, change1)
-            for j in (i + 1):length(optimized_changes)
-                change2 = optimized_changes[j]
+            for j in (i + 1):length(optimized_changes_after_replace)
+                change2 = optimized_changes_after_replace[j]
                 if change2 isa Insert && old_list[change1.index] === change2.value
                     # Found a move
                     push!(final_changes, Move{T}([change1.index => change2.index]))
                     moved_items[change1] = true
-                    moved_items[change2] = true # Fix: use moved_items here
+                    moved_items[change2] = true
                     break
                 end
             end
@@ -132,7 +167,7 @@ function _diff_vectors(old_list::AbstractVector{T}, new_list::AbstractVector{T})
     end
 
     # Add non-moved changes to the final list
-    for change in optimized_changes
+    for change in optimized_changes_after_replace
         if !haskey(moved_items, change)
             push!(final_changes, change)
         end
@@ -140,7 +175,6 @@ function _diff_vectors(old_list::AbstractVector{T}, new_list::AbstractVector{T})
 
     return final_changes
 end
-
 
 """
 A specialized reaction for `ReactiveVector` that receives a list of `VectorChange{T}` events.
@@ -185,7 +219,7 @@ function move!(rv::ReactiveVector{T}, moves::Pair{Int, Int}...) where {T}
         # This helps in handling multiple moves without affecting indices of subsequent moves
         # if they refer to original positions.
         current_value = copy(rv.value)
-        
+
         # For each move, remove the item from its 'from' position and insert it at the 'to' position.
         # This is a simplified approach. For complex, overlapping moves, a more sophisticated
         # algorithm (e.g., based on permutation cycles) might be needed.
@@ -194,7 +228,7 @@ function move!(rv::ReactiveVector{T}, moves::Pair{Int, Int}...) where {T}
                 throw(BoundsError(current_value, max(from, to)))
             end
             item = splice!(current_value, from) # Remove item from 'from'
-            splice!(current_value, to:to-1, [item]) # Insert item at 'to'
+            splice!(current_value, to:(to - 1), [item]) # Insert item at 'to'
         end
         rv.value = current_value
     end
