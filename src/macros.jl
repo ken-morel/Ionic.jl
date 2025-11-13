@@ -15,6 +15,7 @@ macro ionic(expr)
     trans = transcribe(expr)
     code = trans.code
     if code isa Expr && code.head == Symbol("function")
+        #BUG: I don't know about moving the linenumbernodes, but it works
         code.args[2] = Expr(:block, _batch_modifications_in_expr(trans.sets, code.args[2]))
     else
         code = _batch_modifications_in_expr(trans.sets, trans.code)

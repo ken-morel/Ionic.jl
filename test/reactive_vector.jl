@@ -32,10 +32,10 @@ using Test
     @testset "oncollectionchange Granular Notifications" begin
         rv = ReactiveVector{String}(["a", "b"])
         c = Catalyst()
-        
+
         changes_received = []
-        
-        oncollectionchange(c, rv) do _, get_changes
+
+        oncollectionchange(c, rv) do get_changes, _
             append!(changes_received, get_changes())
         end
 
@@ -104,7 +104,7 @@ using Test
         c = Catalyst()
         changes_received = []
 
-        oncollectionchange(c, r) do _, get_changes
+        oncollectionchange(c, r) do get_changes, _
             append!(changes_received, get_changes())
         end
 
@@ -122,7 +122,7 @@ using Test
         c = Catalyst()
         changes_received = []
 
-        oncollectionchange(c, rv) do _, get_changes
+        oncollectionchange(c, rv) do get_changes, _
             append!(changes_received, get_changes())
         end
 

@@ -23,7 +23,7 @@ end
 # 4. Granular subscription using `oncollectionchange`
 # This callback receives a function that, when called, returns a list of specific change events.
 # This is highly efficient for UIs, as the expensive diffing can be deferred and scheduled.
-oncollectionchange(changes_catalyst, rv) do reactive_vector, get_changes
+oncollectionchange(changes_catalyst, rv) do get_changes, reactive_vector
     changes = get_changes() # In a real app, you might schedule this call
     println("\n[Changes Listener] Received ", length(changes), " specific change(s): ")
     for change in changes
@@ -84,7 +84,7 @@ standard_rv = Reactant{Vector{Int}}([10, 20, 30])
 standard_rv_catalyst = Catalyst()
 
 # 2. Subscribe with oncollectionchange
-oncollectionchange(standard_rv_catalyst, standard_rv) do r, get_changes
+oncollectionchange(standard_rv_catalyst, standard_rv) do get_changes, r
     changes = get_changes()
     println("\n[Standard Reactant Listener] Received $(length(changes)) change(s) from diffing:")
     for change in changes
@@ -93,7 +93,7 @@ oncollectionchange(standard_rv_catalyst, standard_rv) do r, get_changes
         elseif change isa Ionic.DeleteAt
             println("  - DELETED at index: $(change.index)")
         elseif change isa Ionic.Replace
-             println("  - REPLACED at index: $(change.index) with value: $(change.value)")
+            println("  - REPLACED at index: $(change.index) with value: $(change.value)")
         else
             println("  - Received unexpected change type: $(typeof(change))")
         end
@@ -113,7 +113,7 @@ println("\n--- Using move! to reorder items ---")
 move_rv = ReactiveVector{Symbol}([:a, :b, :c, :d])
 move_catalyst = Catalyst()
 
-oncollectionchange(move_catalyst, move_rv) do r, get_changes
+oncollectionchange(move_catalyst, move_rv) do get_changes, r
     changes = get_changes()
     println("\n[Move Listener] Received change(s):")
     for change in changes

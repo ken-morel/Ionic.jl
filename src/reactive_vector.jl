@@ -273,7 +273,7 @@ function Base.notify(rv::ReactiveVector{T}, changes::Vector{<:VectorChange{T}}) 
             reactions = copy(rv.reactions)
             for reaction in reactions
                 if reaction isa VectorReaction{T}
-                    reaction.callback(rv, () -> changes)
+                    reaction.callback(() -> changes, rv)
                 else
                     reaction.callback(rv)
                 end
@@ -346,7 +346,7 @@ end
 
 Subscribes to a `ReactiveVector` with a callback that receives a function
 which returns batched list
-of `VectorChange{T}` events. The callback signature must be `(reactive, changes)`.
+of `VectorChange{T}` events. The callback signature must be `(compute_changes, reactive)`.
 """
 function oncollectionchange(
         callback::Function,
@@ -373,11 +373,11 @@ function oncollectionchange(
     ) where {T, V <: AbstractVector{T}}
     old_value = Ref{V}(getvalue(r))
     return catalyze!(c, r) do reactive_vector
-        callback() do
+        callback(reactive_vector) do
             new_value = getvalue(reactive_vector)
             changes = _diff_vectors(old_value[], new_value)
             old_value[] = new_value
-            return changes
+            changes
         end
     end
 end

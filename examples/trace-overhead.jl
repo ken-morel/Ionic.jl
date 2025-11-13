@@ -5,7 +5,7 @@ c = Catalyst()
 
 catalyze!(identity, c, r)
 
-@radical rand(100, r')
+@radical r'
 
 r[] = 5
 
