@@ -21,7 +21,7 @@ using Test
 
         @test r[] == 3
         @test notifications[] == 1 # Should only notify once
-        
+
         # Test nested batches
         batch(r) do
             r[] = 4
@@ -61,7 +61,7 @@ using Test
         rv = ReactiveVector{Int}([1, 2, 3])
         c = Catalyst()
         notifications = Ref(0)
-        changes_received = Vector{VectorChange{Int}}()
+        changes_received = Vector{Ionic.VectorChange{Int}}()
 
         oncollectionchange(c, rv) do _, get_changes
             notifications[] += 1

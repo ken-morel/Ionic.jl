@@ -2,7 +2,6 @@ using Test
 using Ionic
 
 
-
 @testset "Basic Reactant Operations" begin
     # Test basic reactant creation and value access
     r = Reactant(42)
@@ -82,7 +81,7 @@ end
     base = Reactant(2)
 
     doubled = Reactor{Int}(() -> getvalue(base) * 2, nothing, [base])
-    squared = Reactor{Int}(() -> getvalue(doubled) ^ 2, nothing, [doubled])
+    squared = Reactor{Int}(() -> getvalue(doubled)^2, nothing, [doubled])
 
     @test getvalue(doubled) == 4
     @test squared[] == 16
@@ -185,17 +184,19 @@ end
     base = Reactant(1)
     compute_count = 0
 
-    expensive_reactor = Reactor{Int}(() -> begin
-        compute_count += 1
-        getvalue(base) * 1000
-    end, nothing, [base])
+    expensive_reactor = Reactor{Int}(
+        () -> begin
+            compute_count += 1
+            getvalue(base) * 1000
+        end, nothing, [base]
+    )
 
     # First access should compute
     val1 = getvalue(expensive_reactor)
     first_count = compute_count
     @test first_count >= 1
 
-    # Second access without changing base should not recompute  
+    # Second access without changing base should not recompute
     val2 = getvalue(expensive_reactor)
     @test val1 == val2
     # Note: Actual caching behavior depends on implementation
@@ -207,7 +208,7 @@ end
     reactants = []
 
     # Create many temporary reactions
-    for i = 1:10
+    for i in 1:10
         catalyst = Catalyst()
         reactant = Reactant(i)
 
@@ -229,8 +230,8 @@ end
 end
 
 @testset "Edge Cases" begin
-    # Test with empty/null values  
-    null_reactant = Reactant{Union{Nothing,Int}}(nothing)
+    # Test with empty/null values
+    null_reactant = Reactant{Union{Nothing, Int}}(nothing)
     @test getvalue(null_reactant) === nothing
 
     setvalue!(null_reactant, 42)
