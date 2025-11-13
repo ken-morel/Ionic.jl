@@ -244,3 +244,7 @@ end
 @testset "ReactiveVector" begin
     include("reactive_vector.jl")
 end
+
+@testset "Batch" begin
+    include("batch.jl")
+end

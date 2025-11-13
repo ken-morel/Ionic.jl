@@ -1,41 +1,66 @@
 module Ionic
 
 export Reactant, Catalyst, Reaction, AbstractReaction
+
 export getvalue, setvalue!, catalyze!, inhibit!, denature!
+
 export resolve, MayBeReactive
+
 export AbstractReactive, Reactor
+
 export update!, alter!
+
 export @ionic, @reactor, @radical
 
 export trace!, gettrace, ReactiveVector, oncollectionchange, move!
 
+export batch, fire!, batch!, resume! # Export new batching functions
+
 
 """
+
     abstract type AbstractReactive{T} end
 
+
+
 The abstract reactive is the supertype for every
+
 reactive value, where T is the type of the
+
 contained value.
+
 A reactive value supports setvalue!, getvalue
+
 methods. And should have a .reactions attribute.
+
 """
+
 abstract type AbstractReactive{T} end
+
 
 abstract type BuiltinReactive{T} <: AbstractReactive{T} end #TODO: this
 
+
 Base.notify(::AbstractReactive) = error("Not implemented")
 
+
 Base.getindex(r::AbstractReactive) = getvalue(r)
+
 Base.setindex!(r::AbstractReactive, v) = setvalue!(r, v)
 
+
 abstract type AbstractCatalyst end
+
 denature!(::AbstractCatalyst) = error("Not implemented")
+
 catalyze!(::AbstractCatalyst, ::AbstractReactive, fn::Function; kw...) =
+
     error("Not implemented")
 
-abstract type AbstractReaction{T} end
-abstract type BuiltinReaction{T} <: AbstractReaction{T} end
 
+abstract type AbstractReaction{T} end
+
+abstract type BuiltinReaction{T} <: AbstractReaction{T} end
 
 include("trace.jl")
 
@@ -48,6 +73,10 @@ include("reactant.jl")
 include("reactor.jl")
 
 include("reactive_vector.jl")
+
+
+include("batch.jl")
+
 
 include("reactive.jl")
 

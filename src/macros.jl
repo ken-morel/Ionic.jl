@@ -1,3 +1,7 @@
+function _batch_modifications_in_expr(sets::Vector, expr)
+    isempty(sets) && return expr
+    return Expr(:call, batch, Expr(:->, Expr(:tuple), expr), sets...)
+end
 """
     macro ionic(expr)
 
@@ -8,7 +12,15 @@ The code returns the evaluated expression.
 See also [`@reactor`](@ref)
 """
 macro ionic(expr)
-    return esc(transcribe(expr).code)
+    trans = transcribe(expr)
+    code = trans.code
+    if code isa Expr && code.head == Symbol("function")
+        #BUG: I don't know about moving the linenumbernodes, but it works
+        code.args[2] = Expr(:block, _batch_modifications_in_expr(trans.sets, code.args[2]))
+    else
+        code = _batch_modifications_in_expr(trans.sets, trans.code)
+    end
+    return esc(code)
 end
 
 """
@@ -33,7 +45,8 @@ macro reactor(expr, setter = nothing, usedeps = nothing)
         transcribe(setter).code
     end
     deps = something(usedeps, Expr(:vect, trans.gets...))
-    return esc(:(Reactor{$type}(() -> $(trans.code), $setter, $deps)))
+    code = _batch_modifications_in_expr(trans.sets, trans.code)
+    return esc(:($Reactor{$type}(() -> $code, $setter, $deps)))
 end
 
 """
@@ -57,5 +70,6 @@ macro radical(expr, usedeps = nothing, setter = nothing)
         Ionic.transcribe(setter).code
     end
     deps = something(usedeps, Expr(:vect, trans.gets...))
-    return esc(:($Reactor{$type}(() -> $(trans.code), $setter, $deps; eager = true)))
+    code = _batch_modifications_in_expr(trans.sets, trans.code)
+    return esc(:($Reactor{$type}(() -> $code, $setter, $deps; eager = true)))
 end

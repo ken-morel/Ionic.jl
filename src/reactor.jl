@@ -20,6 +20,8 @@ mutable struct Reactor{T} <: BuiltinReactive{T}
     trace::Union{UInt, Nothing}
     const eager::Bool
     const lock::Base.ReentrantLock
+    defer_level::Int # New field
+    needs_notification::Bool # New field
 
     function Reactor{T}(
             getter::Function,
@@ -42,12 +44,14 @@ mutable struct Reactor{T} <: BuiltinReactive{T}
             nothing,
             eager,
             Base.ReentrantLock(),
+            0, # Initialize defer_level
+            false, # Initialize needs_notification
         )
 
         callback = (_) -> begin
             @lock r r.fouled = true
             eager && getvalue(r)
-            notify(r)
+            Base.notify(r) # Use Base.notify
         end
         for reactant in content
             push!(r.content, reactant)
@@ -97,4 +101,22 @@ function setvalue!(r::Reactor{T}, new_value; notify::Bool = true) where {T}
     end
     notify && Base.notify(r)
     return new_value
+end
+
+function Base.notify(r::Reactor{T}) where {T}
+    if r.defer_level > 0
+        r.needs_notification = true
+        return
+    end
+
+    @lock r begin
+        Tracing.record(r.trace, Tracing.Notify) do
+            reactions = copy(r.reactions)
+            for reaction in reactions
+                reaction.callback(r)
+            end
+            reactions
+        end
+    end
+    return
 end
