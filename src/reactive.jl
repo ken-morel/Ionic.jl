@@ -58,3 +58,15 @@ function trace!(c::BuiltinReactive, trace::Bool = true)
 end
 gettrace(@nospecialize(c::BuiltinReactive)) = isnothing(c.trace) ? nothing : Tracing.gettrace(c.trace)
 precompile(gettrace, (BuiltinReactive,))
+
+# --- API for batching notifications ---
+
+batch!(r::BuiltinReactive) = @lock r r.defer_level += 1
+resume!(r::BuiltinReactive) = @lock r r.defer_level -= 1
+
+function fire!(r::BuiltinReactive)
+    if r.needs_notification
+        r.needs_notification = false
+        Base.notify(r)
+    end
+end

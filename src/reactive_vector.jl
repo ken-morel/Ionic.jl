@@ -212,9 +212,11 @@ mutable struct ReactiveVector{T} <: BuiltinReactive{Vector{T}}
     const reactions::Vector{AbstractReaction{Vector{T}}}
     const lock::ReentrantLock
     trace::Union{Nothing, UInt}
+    defer_level::Int # New field
+    pending_changes::Vector{VectorChange{T}} # New field
 
     function ReactiveVector{T}(v::Vector{T}) where {T}
-        return new{T}(v, AbstractReaction{Vector{T}}[], ReentrantLock(), nothing)
+        return new{T}(v, AbstractReaction{Vector{T}}[], ReentrantLock(), nothing, 0, VectorChange{T}[])
     end
     ReactiveVector(v::Vector{T}) where {T} = ReactiveVector{T}(v)
     ReactiveVector{T}() where {T} = ReactiveVector{T}(T[])
@@ -238,7 +240,7 @@ function move!(@nospecialize(rv::ReactiveVector{T}), moves::Pair{Int, Int}...) w
             insert!(rv.value, to, item)
         end
     end
-    return notify(rv, [Move{T}(collect(moves))])
+    return Base.notify(rv, [Move{T}(collect(moves))])
 end
 precompile(move!, (ReactiveVector{Any}, Pair{Int, Int}))
 precompile(move!, (ReactiveVector{Any}, Pair{Int, Int}, Pair{Int, Int}))
@@ -265,6 +267,11 @@ precompile(getvalue, (ReactiveVector{Any},))
 
 
 function Base.notify(rv::ReactiveVector{T}, changes::Vector{<:VectorChange{T}}) where {T}
+    if rv.defer_level > 0
+        append!(rv.pending_changes, changes)
+        return
+    end
+
     @lock rv begin
         Tracing.record(rv.trace, Tracing.Notify) do
             reactions = copy(rv.reactions)
@@ -283,13 +290,21 @@ end
 precompile(notify, (ReactiveVector{Any}, Vector{VectorChange{Any}}))
 
 function Base.notify(rv::ReactiveVector{T}, change::VectorChange{T}) where {T}
-    return notify(rv, [change])
+    return Base.notify(rv, [change])
 end
 precompile(notify, (ReactiveVector{Any}, Push{Any}))
 
 
-Base.notify(rv::ReactiveVector{T}) where {T} = notify(rv, _diff_vectors(rv.value, rv.value))
+Base.notify(rv::ReactiveVector{T}) where {T} = Base.notify(rv, _diff_vectors(rv.value, rv.value))
 precompile(notify, (ReactiveVector{Any},))
+
+function flush!(rv::ReactiveVector)
+    return if !isempty(rv.pending_changes)
+        changes_to_send = copy(rv.pending_changes)
+        empty!(rv.pending_changes)
+        Base.notify(rv, changes_to_send)
+    end
+end
 
 
 function Base.push!(@nospecialize(rv::ReactiveVector{T}), items...) where {T}
@@ -372,7 +387,7 @@ function oncollectionchange(
     ) where {T, V <: AbstractVector{T}}
     old_value = Ref{V}(getvalue(r))
     return catalyze!(c, r) do reactive_vector
-        callback(changes) do
+        callback() do
             new_value = getvalue(reactive_vector)
             changes = _diff_vectors(old_value[], new_value)
             old_value[] = new_value
