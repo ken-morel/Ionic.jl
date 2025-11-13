@@ -18,10 +18,12 @@ Ionic's reactivity model is built around a few key concepts:
 
 ## Key Feature: The `'` Syntax and `@ionic`
 
-A central feature of `Ionic.jl` is a special syntax that makes working with reactive objects feel natural and declarative. The `transcribe` function, used by the `@ionic` macro, automatically rewrites expressions:
+A central feature of `Ionic.jl` is a special syntax that makes working with reactive objects feel natural and declarative. The `transcribe` function, used by the `@ionic` and `@radical` macros, automatically rewrites expressions:
 
 -   `my_reactant'` is transcribed to `getvalue(my_reactant)`.
 -   `my_reactant' = new_value` is transcribed to `setvalue!(my_reactant, new_value)`.
+
+Crucially, when assignments (`my_reactant' = new_value`) occur within `@ionic` or `@radical` blocks, they are now automatically wrapped in a `batch()` call. This means that if multiple reactive variables are updated within a single `@ionic` or `@radical` expression, all notifications are collected and sent out only once at the end, preventing redundant computations and improving performance.
 
 This allows you to write clean, readable code while `Ionic.jl` handles the underlying reactivity and dependency tracking for you.
 
@@ -41,6 +43,14 @@ println(b') #> 10
 a' = 10
 
 println(b[]) #> 20
+
+# Example of automatic batching:
+# Even though 'a' is set twice, the reactor 'b' will only notify once
+@ionic begin
+    a' = 100
+    a' = 200
+end
+println(b[]) #> 400 (only one notification for 'b')
 ```
 
 ## API Overview
@@ -123,4 +133,113 @@ end
 
 # Clean up all subscriptions
 denature!(c)
+```
+
+## Advanced Features
+
+### Batching Updates
+
+Ionic.jl provides a powerful batching mechanism to group multiple reactive updates into a single notification cycle. This significantly improves performance by preventing redundant computations and ensuring a consistent state.
+
+**Functions:**
+
+-   `batch(f::Function, reactives::AbstractReactive...)`: Executes a function `f` in a batch. All notifications for the specified `reactives` triggered within `f` are deferred and sent as a single update after `f` completes.
+-   `batch!(r::AbstractReactive)`: Manually increments the deferral level for a reactive object. Notifications are deferred if the deferral level is greater than zero.
+-   `resume!(r::AbstractReactive)`: Manually decrements the deferral level for a reactive object. When the deferral level reaches zero, any pending notifications are sent.
+-   `fire!(r::AbstractReactive)`: Forces any pending (batched) notifications to be sent for the given reactive object, regardless of the deferral level. This is automatically called by `batch` when the deferral level returns to zero.
+
+**Usage Example (see also [examples/reactive_vector.jl](examples/reactive_vector.jl)):**
+
+```julia
+using Ionic
+
+r = Reactant(0)
+c = Catalyst()
+notifications = Ref(0)
+
+catalyze!(c, r) do _
+    notifications[] += 1
+end
+
+println("Notifications before batch: ", notifications[]) #> 0
+
+batch(r) do
+    r[] = 1 # Deferred
+    r[] = 2 # Deferred
+    r[] = 3 # Deferred
+end
+
+println("Notifications after batch: ", notifications[]) #> 1 (only one notification)
+println("Final value: ", r[]) #> 3
+```
+
+### `ReactiveVector` for Granular List Updates
+
+The `ReactiveVector{T}` type is a specialized reactive container that wraps a `Vector{T}`. Unlike a standard `Reactant{Vector{T}}`, it emits granular change events for operations like `push!`, `pop!`, `setindex!`, `insert!`, `deleteat!`, and `move!`. This allows UI components to perform highly efficient, targeted updates instead of re-rendering entire lists.
+
+**Key Functions:**
+
+-   `oncollectionchange(callback::Function, catalyst::Catalyst, rv::ReactiveVector)`: Subscribes a callback that receives two arguments: first, a function (`get_changes_closure`) which, when called, returns a list of `VectorChange` events (e.g., `Push`, `Pop`, `Move`, `Replace`, `Insert`, `DeleteAt`, `Empty`) that occurred during a notification cycle; and second, the `ReactiveVector` itself.
+-   `move!(rv::ReactiveVector, moves::Pair{Int, Int}...)`: Efficiently reorders items within the `ReactiveVector`, emitting a `Move` event.
+
+**Usage Example (see [examples/reactive_vector.jl](examples/reactive_vector.jl)):**
+
+```julia
+using Ionic
+
+rv = ReactiveVector{String}(["apple", "banana"])
+c = Catalyst()
+changes_received = []
+
+oncollectionchange(c, rv) do get_changes, reactive_vector # Note the argument order
+    append!(changes_received, get_changes())
+end
+
+push!(rv, "cherry")
+println("Changes: ", changes_received) #> [Push(["cherry"])]
+empty!(changes_received)
+
+rv[1] = "apricot"
+println("Changes: ", changes_received) #> [Replace("apricot", 1)]
+empty!(changes_received)
+
+move!(rv, 2 => 1) # Move 'banana' from index 2 to 1
+println("Changes: ", changes_received) #> [Move([2 => 1])]
+```
+
+### Reactivity Debugging Tools (Tracing)
+
+Ionic.jl includes powerful tracing tools to help debug complex reactive graphs. You can enable tracing on any reactive object to log detailed information about its interactions.
+
+**Functions:**
+
+-   `trace!(r::AbstractReactive, enable::Bool = true)`: Enables or disables tracing for a specific reactive object `r`.
+-   `gettrace(r::AbstractReactive)`: Retrieves the `TraceLog` for a reactive object, containing all recorded events.
+-   `printtrace(log::TraceLog)`: Prints a formatted, human-readable output of the `TraceLog` to the console.
+
+**Logged Events:**
+
+-   `Get`: When the value of a reactive object is read.
+-   `Set`: When the value of a reactive object is set.
+-   `Notify`: When a reactive object notifies its subscribers.
+-   `Subscribe`: When a new reaction is subscribed.
+-   `Unsubscribe`: When a reaction is unsubscribed.
+-   `Inhibit`: When a reaction is inhibited.
+
+Each event includes a timestamp, duration, value (for Get/Set), and a stack trace to pinpoint the origin of the interaction.
+
+**Usage Example (see [examples/tracing.jl](examples/tracing.jl)):**
+
+```julia
+using Ionic
+
+r = Reactant(10)
+trace!(r) # Enable tracing for reactant 'r'
+
+r[] = 20 # This will generate a 'Set' event
+val = r[] # This will generate a 'Get' event
+
+log = gettrace(r)
+printtrace(log)
+# Output will show formatted Get and Set events with timestamps and stack traces.
 ```
