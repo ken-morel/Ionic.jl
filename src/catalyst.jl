@@ -20,6 +20,7 @@ end
 
 for fn in [:lock, :trylock, :unlock]
     @eval Base.$fn(r::Catalyst) = Base.$fn(r.lock)
+    @eval precompile(Base.$fn, (Catalyst,))
 end
 
 """
@@ -27,18 +28,20 @@ end
 
 Add the reaction to the catalyst(thread safe)
 """
-add!(c::Catalyst, r::AbstractReaction) = @lock c push!(c.reactions, r)
+add!(c::Catalyst, @nospecialize(r::AbstractReaction)) = @lock c push!(c.reactions, r)
+precompile(add!, (Catalyst, AbstractReaction))
 
 """
     Base.pop!(c::Catalyst, r::AbstractReaction)
 
 Remove the reaction from the catalyst(thread safe)
 """
-remove!(c::Catalyst, r::AbstractReaction) = @lock c filter!(o -> o !== r, c.reactions)
+remove!(c::Catalyst, @nospecialize(r::AbstractReaction)) = @lock c filter!(o -> o !== r, c.reactions)
+precompile(remove!, (Catalyst, AbstractReaction))
 
 
 """
-    function catalyze!(c::Catalyst, r::AbstractReactive{T}, callback::Function)::Reaction{T} where {T}
+    catalyze!(c::Catalyst, r::AbstractReactive{T}, callback::Function)::Reaction{T} where {T}
     catalyze!(fn::Function, c::Catalyst, r::AbstractReactive{T}) where {T}
 
 Subscribes and calls `callback` everytime `r` notifies.
@@ -63,8 +66,8 @@ end
 """
 function catalyze!(
         c::Catalyst,
-        r::AbstractReactive{T},
-        callback::Function,
+        @nospecialize(r::AbstractReactive{T}),
+        @nospecialize(callback::Function),
     )::Reaction{T} where {T}
 
     reaction = Reaction{T}(r, c, callback)
@@ -73,8 +76,10 @@ function catalyze!(
     add!(r, reaction)
     return reaction
 end
+precompile(catalyze!, (Catalyst, AbstractReactive{Any}, Function))
 
-catalyze!(fn::Function, c::Catalyst, r::AbstractReactive{T}) where {T} = catalyze!(c, r, fn)
+catalyze!(@nospecialize(fn::Function), c::Catalyst, @nospecialize(r::AbstractReactive{T})) where {T} = catalyze!(c, r, fn)
+precompile(catalyze!, (Function, Catalyst, AbstractReactive{Any}))
 
 
 """
@@ -94,33 +99,34 @@ end
 
 
 """
-    inhibit!(catalyst::Catalyst, reactant::AbstractReactive, callback::Union{Function, Nothing} = nothing)
-    inhibit!(::Reaction)
-
+    inhibit!(catalyst::Catalyst, reactant::AbstractReactive[, callback::Union{Function, Nothing}])
 
 Searches and inhibit all reactions between the catalyst and reactant, if a callback is 
 passed, it checks for a reaction which has that callback.
 returns the number of inhibited reactions.
 """
 function inhibit!(
-        catalyst::AbstractCatalyst,
-        reactant::AbstractReactive,
-        callback::Union{Function, Nothing} = nothing,
+        catalyst::Catalyst,
+        @nospecialize(reactant::AbstractReactive),
+        @nospecialize(callback::Function),
     )
     return @lock catalyst begin
-        reactions_to_inhibit = if isnothing(callback)
-            filter(catalyst.reactions) do sub
-                sub.reactant === reactant
-            end
-        else
-            filter(catalyst.reactions) do sub
-                sub.reactant === reactant && sub.callback === callback
-            end
-        end
-
-        for reaction in reactions_to_inhibit
-            inhibit!(reaction)
-        end
+        reactions_to_inhibit =
+            filter(s -> s.reactant === reactant && s.callback === callback, catalyst.reactions)
+        foreach(inhibit!, reactions_to_inhibit)
         length(reactions_to_inhibit)
     end
 end
+precompile(inhibit!, (AbstractReactive, Function))
+
+function inhibit!(
+        catalyst::Catalyst,
+        @nospecialize(reactant::AbstractReactive),
+    )
+    return @lock catalyst begin
+        reactions_to_inhibit = filter(s -> s.reactant === reactant, catalyst.reactions)
+        foreach(inhibit!, reactions_to_inhibit)
+        length(reactions_to_inhibit)
+    end
+end
+precompile(inhibit!, (AbstractReactive,))

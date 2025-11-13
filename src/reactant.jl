@@ -22,9 +22,8 @@ mutable struct Reactant{T} <: BuiltinReactive{T}
 end
 
 
-function getvalue(r::Reactant{T}) where {T}
-    return Tracing.record(() -> r.value[], r.trace, Tracing.Get)
-end
+getvalue(r::Reactant{T}) where {T} = Tracing.record(() -> r.value[], r.trace, Tracing.Get)
+
 
 function setvalue!(r::Reactant{T}, new_value; notify::Bool = true) where {T}
     Tracing.record(() -> @lock(r, r.value[] = convert(T, new_value)), r.trace, Tracing.Set)

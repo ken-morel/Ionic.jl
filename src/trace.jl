@@ -104,7 +104,8 @@ function record(fn::Function, id::UInt, ::Type{Notify})
         trace(id, Notify(; start, stop, error, stack, reactions))
     end
 end
-record(fn::Function, ::Nothing, ::Type{T}) where {T <: Trace} = fn()
+record(fn::Function, ::Nothing, ::Type{Notify}) = fn()
+precompile(record, (Function, Nothing, Type{Notify}))
 
 @kwdef struct Subscribe <: Trace
     reaction::Ionic.AbstractReaction
@@ -142,6 +143,7 @@ function record(fn::Function, id::UInt, ::Type{Inhibit})
     end
 end
 record(fn::Function, ::Nothing, ::Type{Inhibit}) = fn()
+precompile(record, (Function, Nothing, Type{Inhibit}))
 
 function record(fn::Function, id::UInt, ::Type{T}, reaction::Ionic.AbstractReaction) where {T <: Union{Subscribe, Unsubscribe}}
     start = time_ns()

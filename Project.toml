@@ -5,11 +5,9 @@ authors = ["ken-morel <engonken8@gmail.com>"]
 
 [deps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
-PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 
 [compat]
 Dates = "1.11.0"
-PrecompileTools = "1.3.3"
 Test = "1.11.0"
 
 [extras]

@@ -7,7 +7,7 @@ They store the catalyst, reactive and callback.
 They are returned when [catalyze!](@ref) is called 
 and can be [inhibit!](@ref)-ed.
 """
-struct Reaction{T} <: AbstractReaction{T}
+struct Reaction{T} <: BuiltinReaction{T}
     reactant::AbstractReactive{T}
     catalyst::AbstractCatalyst
     callback::Function
@@ -21,9 +21,10 @@ Stops and removes a single, specific Reaction. This is the low-level implementat
 It does so by calling [`pop!`](@ref) on the catalyst and reactants, which is again
 more lowlevel.
 """
-function inhibit!(r::AbstractReaction)
+function inhibit!(@nospecialize(r::BuiltinReaction))
     remove!(r.catalyst, r)
     remove!(r.reactant, r)
 
     return
 end
+precompile(inhibit!, (BuiltinReactive,))

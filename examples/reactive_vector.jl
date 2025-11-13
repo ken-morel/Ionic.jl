@@ -51,28 +51,28 @@ println("\n--- Performing Operations on ReactiveVector ---")
 
 # A. Push a new item
 println("\n1. Pushing 'cherries'...")
-push!(rv, "cherries")
+@time push!(rv, "cherries")
 
 # B. Set an index
 println("\n2. Setting index 1 to 'apricots'...")
-rv[1] = "apricots"
+@time rv[1] = "apricots"
 
 # C. Pop an item
 println("\n3. Popping an item...")
-popped_value = pop!(rv)
+@time popped_value = pop!(rv)
 println("   (Popped value was: ", popped_value, ")")
 
 # D. Delete an item at a specific index
 println("\n4. Deleting item at index 2...")
-deleteat!(rv, 2)
+@time deleteat!(rv, 2)
 
 # E. Insert an item
 println("\n5. Inserting 'blueberries' at index 1...")
-insert!(rv, 1, "blueberries")
+@time insert!(rv, 1, "blueberries")
 
 # F. Empty the vector
 println("\n6. Emptying the vector...")
-empty!(rv)
+@time empty!(rv)
 
 
 # --- Overload Example ---
@@ -98,7 +98,10 @@ end
 
 # 3. Trigger a change. The diffing algorithm will detect the precise changes.
 println("\n1. Replacing the entire vector (will be diffed)...")
-standard_rv[] = [10, 50, 30] # Changed 20 to 50
+@time standard_rv[] = [10, 50, 30] # Changed 20 to 50
+
+println("\n1. Replacing the entire vector again (will be diffed)...")
+@time standard_rv[] = [10, 50, 30] # Changed 20 to 50
 
 
 # --- Move Example ---
@@ -117,7 +120,11 @@ oncollectionchange(move_catalyst, move_rv) do r, changes
 end
 
 println("\n1. Moving item from index 2 to 4...")
-move!(move_rv, 2 => 4)
+@time move!(move_rv, 2 => 4)
+
+
+println("\n1. Moving item from index 3 to 2 and 2 to 1...")
+@time move!(move_rv, 3 => 2, 2 => 1)
 
 
 # --- Cleanup ---
