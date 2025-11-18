@@ -370,7 +370,7 @@ function oncollectionchange(
         callback::Function,
         c::AbstractCatalyst,
         r::AbstractReactive{V},
-    ) where {T, V <: AbstractVector{T}}
+    ) where {V <: AbstractVector{<:T}} where {T}
     old_value = Ref{V}(getvalue(r))
     return catalyze!(c, r) do reactive_vector
         callback(reactive_vector) do

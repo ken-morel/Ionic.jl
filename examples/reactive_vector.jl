@@ -4,7 +4,6 @@ using Ionic
 println("--- ReactiveVector Usage Example ---")
 
 # 1. Create a ReactiveVector
-# It's a reactive object that wraps a standard Vector
 rv = ReactiveVector{String}(["apples", "bananas"])
 
 # 2. Create catalysts to manage subscriptions

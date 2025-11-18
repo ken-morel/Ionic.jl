@@ -1,20 +1,13 @@
 module Ionic
 
 export Reactant, Catalyst, Reaction, AbstractReaction
-
 export getvalue, setvalue!, catalyze!, inhibit!, denature!
-
 export resolve, MayBeReactive
-
 export AbstractReactive, Reactor
-
 export update!, alter!
-
 export @ionic, @reactor, @radical
-
-export trace!, gettrace, ReactiveVector, oncollectionchange, move!
-
-export batch, fire!, batch!, resume! # Export new batching functions
+export trace!, gettrace, ReactiveVector, oncollectionchange, move!, remove!
+export batch, fire!, batch!, resume!
 
 
 """
@@ -42,19 +35,14 @@ abstract type BuiltinReactive{T} <: AbstractReactive{T} end #TODO: this
 
 
 Base.notify(::AbstractReactive) = error("Not implemented")
-
-
 Base.getindex(r::AbstractReactive) = getvalue(r)
-
 Base.setindex!(r::AbstractReactive, v) = setvalue!(r, v)
 
 
 abstract type AbstractCatalyst end
 
 denature!(::AbstractCatalyst) = error("Not implemented")
-
 catalyze!(::AbstractCatalyst, ::AbstractReactive, fn::Function; kw...) =
-
     error("Not implemented")
 
 
@@ -63,21 +51,12 @@ abstract type AbstractReaction{T} end
 abstract type BuiltinReaction{T} <: AbstractReaction{T} end
 
 include("trace.jl")
-
 include("catalyst.jl")
-
 include("reaction.jl")
-
 include("reactant.jl")
-
 include("reactor.jl")
-
 include("reactive_vector.jl")
-
-
 include("batch.jl")
-
-
 include("reactive.jl")
 
 include("transcribe.jl")
@@ -91,14 +70,14 @@ include("macros.jl")
 Use this in cases you deal with values like component
 arguments which may be an instance of abstract reactive.
 
-You can then call resolve() on them which 
+You can then call resolve() on them which
 """
 const MayBeReactive{T} = Union{AbstractReactive{T}, T}
 
 """
     converter(::Type{AbstractReactive{T}}, r::AbstractReactive{K};eager) where {T, K}
 
-Creates a reactor which subscribes and get's it value 
+Creates a reactor which subscribes and get's it value
 from converting that of the other and set's it with another
 conversion.
 """
@@ -129,8 +108,8 @@ resolve(::Type{T}, r::AbstractReactive) where {T} = convert(T, getvalue(r))
 """
     update!(fn::Function, r::AbstractReactive)
 
-A helper to update the reactive's value, 
-the function receives the reactive's value 
+A helper to update the reactive's value,
+the function receives the reactive's value
 and returns a new one.
 """
 function update!(fn::Function, r::AbstractReactive)
@@ -157,8 +136,8 @@ end
 """
 Setvalue set's the value of a given AbstractReactive{T}
 object.
-It accepts a `notify` optional keyword argument which if 
-set to false, prevents it from notifying subscribed values 
+It accepts a `notify` optional keyword argument which if
+set to false, prevents it from notifying subscribed values
 about it's change
 """
 function setvalue! end
@@ -194,11 +173,11 @@ function sync!(c::AbstractCatalyst, reactives::Vector{<:AbstractReactive})
     end
     return
 end
+
 precompile(sync!, (Catalyst, Vector{BuiltinReactive}))
 precompile(sync!, (Catalyst, Vector{Reactant}))
 precompile(sync!, (Catalyst, Vector{Reactor}))
 precompile(sync!, (Catalyst, Vector{ReactiveVector}))
 sync!(c::AbstractCatalyst, reactives::AbstractReactive...) = sync!(c, collect(reactives))
 
-
-end # module Ionic
+end

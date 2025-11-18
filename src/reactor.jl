@@ -5,8 +5,8 @@ A reactor is a reactive container that derives its value
 from another value, it can also be used to wrap
 another or more reactants, transforming their values.
 
-A reactor is said to be `fouled` when one of it 
-dependencies has changed, and the value was not 
+A reactor is said to be `fouled` when one of it
+dependencies has changed, and the value was not
 yet updated.
 """
 mutable struct Reactor{T} <: BuiltinReactive{T}
@@ -20,8 +20,8 @@ mutable struct Reactor{T} <: BuiltinReactive{T}
     trace::Union{UInt, Nothing}
     const eager::Bool
     const lock::Base.ReentrantLock
-    defer_level::Int # New field
-    needs_notification::Bool # New field
+    defer_level::Int
+    needs_notification::Bool
 
     function Reactor{T}(
             getter::Function,
@@ -44,7 +44,7 @@ mutable struct Reactor{T} <: BuiltinReactive{T}
             nothing,
             eager,
             Base.ReentrantLock(),
-            0, # Initialize defer_level
+            0,
             false, # Initialize needs_notification
         )
 
@@ -73,7 +73,7 @@ isfouled(r::Reactor) = @lock r r.fouled
 """
     function getvalue(r::Reactor{T})::T where {T}
 
-Get the value of a reactor, recomputing the 
+Get the value of a reactor, recomputing the
 value if one of it dependencies changed(
 isfouled(r) is true).
 """
